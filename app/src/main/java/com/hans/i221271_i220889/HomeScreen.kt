@@ -14,16 +14,19 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.hans.i221271_i220889.adapters.PostAdapter
 import com.hans.i221271_i220889.models.Post
-import com.hans.i221271_i220889.utils.PostRepository
-import com.hans.i221271_i220889.utils.PresenceManager
-import com.google.firebase.database.DataSnapshot
-import com.google.firebase.database.DatabaseError
-import com.google.firebase.database.FirebaseDatabase
-import com.google.firebase.database.ValueEventListener
+import com.hans.i221271_i220889.repositories.PostRepositoryApi
+import com.hans.i221271_i220889.repositories.StoryRepository
+import com.hans.i221271_i220889.network.SessionManager
+import com.hans.i221271_i220889.network.ApiConfig
+import androidx.lifecycle.lifecycleScope
+import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
+import com.squareup.picasso.Picasso
+import kotlinx.coroutines.launch
 
 class HomeScreen : AppCompatActivity() {
-    private val database: FirebaseDatabase = FirebaseDatabase.getInstance()
-    private lateinit var postRepository: PostRepository
+    private lateinit var postRepository: PostRepositoryApi
+    private lateinit var storyRepository: StoryRepository
+    private lateinit var sessionManager: SessionManager
     private lateinit var postsRecyclerView: RecyclerView
     private lateinit var postAdapter: PostAdapter
     private val posts = mutableListOf<Post>()
@@ -44,19 +47,13 @@ class HomeScreen : AppCompatActivity() {
             return
         }
         
-        try {
-        PresenceManager.setOnline()
-        } catch (e: Exception) {
-            // If Firebase is not initialized, continue without presence
-        }
+        // Initialize repositories
+        sessionManager = SessionManager(this)
+        postRepository = PostRepositoryApi(this)
+        storyRepository = StoryRepository(this)
         
-        // Initialize post repository and adapter
-        try {
-        postRepository = PostRepository()
+        // Setup RecyclerViews
         setupPostsRecyclerView()
-        } catch (e: Exception) {
-            // If Firebase is not initialized, continue without posts
-        }
         
         // Initialize stories RecyclerView early
         try {
@@ -104,12 +101,8 @@ class HomeScreen : AppCompatActivity() {
             android.util.Log.e("HomeScreen", "Error loading profile image: ${e.message}", e)
         }
 
-        // Load and display stories from Firebase with 24-hour expiry
-            try {
-        loadStoriesFromFirebase()
-            } catch (e: Exception) {
-                // If Firebase is not initialized, continue without stories
-            }
+        // Load stories from API
+        loadStoriesFromApi()
 
         // Set up the Search button to open the search screen
         val searchBtn = findViewById<ImageButton>(R.id.tab_2_search)
@@ -157,12 +150,8 @@ class HomeScreen : AppCompatActivity() {
             startActivityForResult(intentCreatePost, 100)
         }
 
-        // Load posts from Firebase
-        try {
-            loadPostsFromFirebase()
-        } catch (e: Exception) {
-            // If Firebase is not initialized, continue without posts
-        }
+        // Load posts from API
+        loadPostsFromApi()
     }
 
     private fun setupPostsRecyclerView() {
@@ -224,17 +213,30 @@ class HomeScreen : AppCompatActivity() {
         }
     }
 
-    private fun loadPostsFromFirebase() {
-        try {
-        postRepository.getPosts { loadedPosts ->
-            runOnUiThread {
+    private fun loadPostsFromApi() {
+        lifecycleScope.launch {
+            val result = postRepository.getFeed(page = 1, limit = 50)
+            result.onSuccess { postDataList ->
                 posts.clear()
-                posts.addAll(loadedPosts)
+                postDataList.forEach { postData ->
+                    posts.add(Post(
+                        postId = postData.id.toString(),
+                        userId = postData.userId.toString(),
+                        username = postData.username,
+                        userProfileImageBase64 = postData.profilePicture ?: "",
+                        caption = postData.caption ?: "",
+                        imageBase64 = postData.mediaUrl ?: "",
+                        videoBase64 = if (postData.mediaType == "video") postData.mediaUrl ?: "" else "",
+                        timestamp = System.currentTimeMillis(),
+                        likesCount = postData.likesCount,
+                        commentsCount = postData.commentsCount,
+                        isLikedByCurrentUser = postData.isLiked
+                    ))
+                }
                 postAdapter.notifyDataSetChanged()
+            }.onFailure { error ->
+                Toast.makeText(this@HomeScreen, "Failed to load posts: ${error.message}", Toast.LENGTH_SHORT).show()
             }
-            }
-        } catch (e: Exception) {
-            // If Firebase is not initialized, continue without posts
         }
     }
 
@@ -242,25 +244,32 @@ class HomeScreen : AppCompatActivity() {
         super.onActivityResult(requestCode, resultCode, data)
         if (requestCode == 100 && resultCode == RESULT_OK) {
             // Refresh posts when returning from create post
-            loadPostsFromFirebase()
+            loadPostsFromApi()
         }
     }
-
-    override fun onStart() {
-        super.onStart()
-        try {
-        PresenceManager.setOnline()
-        } catch (e: Exception) {
-            // If Firebase is not initialized, continue without presence
-        }
-    }
-
-    override fun onStop() {
-        super.onStop()
-        try {
-        PresenceManager.setOffline()
-        } catch (e: Exception) {
-            // If Firebase is not initialized, continue without presence
+    
+    private fun loadStoriesFromApi() {
+        lifecycleScope.launch {
+            val result = storyRepository.getAllStories()
+            result.onSuccess { storyDataList ->
+                stories.clear()
+                storyDataList.forEach { storyData ->
+                    val imageUrl = ApiConfig.BASE_URL + storyData.mediaUrl
+                    stories.add(com.hans.i221271_i220889.models.Story(
+                        storyId = storyData.id.toString(),
+                        userId = storyData.userId.toString(),
+                        username = storyData.username,
+                        userProfileImage = storyData.profilePicture ?: "",
+                        imageUrl = imageUrl,
+                        videoUrl = if (storyData.mediaType == "video") imageUrl else "",
+                        timestamp = System.currentTimeMillis(),
+                        expiresAt = System.currentTimeMillis() + (24 * 60 * 60 * 1000)
+                    ))
+                }
+                storyAdapter.updateStories(stories)
+            }.onFailure { error ->
+                Toast.makeText(this@HomeScreen, "Failed to load stories: ${error.message}", Toast.LENGTH_SHORT).show()
+            }
         }
     }
 
