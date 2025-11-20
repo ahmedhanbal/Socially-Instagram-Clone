@@ -11,10 +11,14 @@ import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import com.hans.i221271_i220889.utils.Base64Image
-import com.hans.i221271_i220889.utils.FirebaseAuthManager
+import com.hans.i221271_i220889.repositories.ProfileRepository
+import com.hans.i221271_i220889.network.SessionManager
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.launch
 
 class ProfilePictureUpdateActivity : AppCompatActivity() {
-    private lateinit var authManager: FirebaseAuthManager
+    private lateinit var profileRepository: ProfileRepository
+    private lateinit var sessionManager: SessionManager
     private lateinit var profileImageView: ImageView
     private var selectedImageUri: Uri? = null
     
@@ -31,11 +35,8 @@ class ProfilePictureUpdateActivity : AppCompatActivity() {
         // Create simple UI programmatically
         createSimpleProfilePictureScreen()
         
-        try {
-            authManager = FirebaseAuthManager()
-        } catch (e: Exception) {
-            // If Firebase fails to initialize, continue without it
-        }
+        profileRepository = ProfileRepository(this)
+        sessionManager = SessionManager(this)
     }
     
     private fun createSimpleProfilePictureScreen() {
@@ -126,24 +127,21 @@ class ProfilePictureUpdateActivity : AppCompatActivity() {
         }
         
         try {
-            val currentUser = authManager.getCurrentUser()
-            if (currentUser != null) {
-                // Convert image to Base64
-                val base64Image = Base64Image.uriToBase64(this, selectedImageUri!!, 70)
-                if (base64Image != null) {
-                    // Update user profile with new image (using profileImageBase64 for Realtime Database)
-                    val updatedUser = currentUser.copy(profileImageBase64 = base64Image)
-                    authManager.updateUserProfile(updatedUser) { success ->
-                        if (success) {
-                            Toast.makeText(this, "Profile picture updated successfully!", Toast.LENGTH_SHORT).show()
-                            finish()
-                        } else {
-                            Toast.makeText(this, "Failed to update profile picture", Toast.LENGTH_SHORT).show()
-                        }
+            // Convert image to Base64
+            val base64Image = Base64Image.uriToBase64(this, selectedImageUri!!, 70)
+            if (base64Image != null) {
+                lifecycleScope.launch {
+                    val result = profileRepository.updateProfile(profilePicture = base64Image)
+                    result.onSuccess {
+                        sessionManager.updateProfilePicture(base64Image)
+                        Toast.makeText(this@ProfilePictureUpdateActivity, "Profile picture updated successfully!", Toast.LENGTH_SHORT).show()
+                        finish()
+                    }.onFailure { error ->
+                        Toast.makeText(this@ProfilePictureUpdateActivity, "Failed to update: ${error.message}", Toast.LENGTH_SHORT).show()
                     }
-                } else {
-                    Toast.makeText(this, "Failed to process image", Toast.LENGTH_SHORT).show()
                 }
+            } else {
+                Toast.makeText(this, "Failed to process image", Toast.LENGTH_SHORT).show()
             } else {
                 Toast.makeText(this, "User not logged in", Toast.LENGTH_SHORT).show()
             }

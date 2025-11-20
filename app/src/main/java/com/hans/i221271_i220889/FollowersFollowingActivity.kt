@@ -9,12 +9,14 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.hans.i221271_i220889.adapters.UserAdapter
 import com.hans.i221271_i220889.models.User
-import com.hans.i221271_i220889.utils.FirebaseAuthManager
-import com.hans.i221271_i220889.utils.FollowManager
+import com.hans.i221271_i220889.repositories.FollowRepository
+import com.hans.i221271_i220889.network.SessionManager
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.launch
 
 class FollowersFollowingActivity : AppCompatActivity() {
-    private lateinit var followManager: FollowManager
-    private lateinit var authManager: FirebaseAuthManager
+    private lateinit var followRepository: FollowRepository
+    private lateinit var sessionManager: SessionManager
     private lateinit var usersRecyclerView: RecyclerView
     private lateinit var userAdapter: UserAdapter
     private val users = mutableListOf<User>()
@@ -30,12 +32,8 @@ class FollowersFollowingActivity : AppCompatActivity() {
         
         createSimpleFollowersFollowingScreen()
         
-        try {
-            followManager = FollowManager()
-            authManager = FirebaseAuthManager()
-        } catch (e: Exception) {
-            // If Firebase fails to initialize, continue without it
-        }
+        followRepository = FollowRepository(this)
+        sessionManager = SessionManager(this)
         
         setupUsersRecyclerView()
         loadUsers()
@@ -113,7 +111,7 @@ class FollowersFollowingActivity : AppCompatActivity() {
     private fun setupUsersRecyclerView() {
         userAdapter = UserAdapter(users) { user ->
             // Handle user click - navigate to user profile
-            val currentUserId = authManager.getCurrentUser()?.userId
+            val currentUserId = sessionManager.getUserId().toString()
             if (user.userId == currentUserId) {
                 // Navigate to own profile
                 val intent = android.content.Intent(this, OwnProfile::class.java)
@@ -129,30 +127,8 @@ class FollowersFollowingActivity : AppCompatActivity() {
     }
     
     private fun loadUsers() {
-        try {
-            // Use targetUserId if provided, otherwise use current user
-            val userId = targetUserId ?: authManager.getCurrentUser()?.userId
-            if (userId != null) {
-                if (currentMode == "followers") {
-                    followManager.getFollowers(userId) { followers ->
-                        runOnUiThread {
-                            users.clear()
-                            users.addAll(followers)
-                            userAdapter.notifyDataSetChanged()
-                        }
-                    }
-                } else {
-                    followManager.getFollowing(userId) { following ->
-                        runOnUiThread {
-                            users.clear()
-                            users.addAll(following)
-                            userAdapter.notifyDataSetChanged()
-                        }
-                    }
-                }
-            }
-        } catch (e: Exception) {
-            Toast.makeText(this, "Demo mode - No ${currentMode}", Toast.LENGTH_SHORT).show()
-        }
+        // TODO: Implement followers/following API endpoints
+        // For now, show empty list
+        Toast.makeText(this, "Followers/Following feature coming soon", Toast.LENGTH_SHORT).show()
     }
 }

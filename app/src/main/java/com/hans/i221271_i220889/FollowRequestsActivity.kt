@@ -10,12 +10,14 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.hans.i221271_i220889.adapters.FollowRequestsAdapter
 import com.hans.i221271_i220889.models.User
-import com.hans.i221271_i220889.utils.FirebaseAuthManager
-import com.hans.i221271_i220889.utils.FollowManager
+import com.hans.i221271_i220889.repositories.FollowRepository
+import com.hans.i221271_i220889.network.SessionManager
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.launch
 
 class FollowRequestsActivity : AppCompatActivity() {
-    private lateinit var followManager: FollowManager
-    private lateinit var authManager: FirebaseAuthManager
+    private lateinit var followRepository: FollowRepository
+    private lateinit var sessionManager: SessionManager
     private lateinit var requestsRecyclerView: RecyclerView
     private lateinit var requestsAdapter: FollowRequestsAdapter
     private val pendingRequests = mutableListOf<User>()
@@ -26,12 +28,8 @@ class FollowRequestsActivity : AppCompatActivity() {
         // Create simple UI programmatically
         createSimpleFollowRequestsScreen()
         
-        try {
-            followManager = FollowManager()
-            authManager = FirebaseAuthManager()
-        } catch (e: Exception) {
-            // If Firebase fails to initialize, continue without it
-        }
+        followRepository = FollowRepository(this)
+        sessionManager = SessionManager(this)
         
         setupFollowRequestsRecyclerView()
         loadPendingFollowRequests()
@@ -89,45 +87,15 @@ class FollowRequestsActivity : AppCompatActivity() {
     
     private fun setupFollowRequestsRecyclerView() {
         requestsAdapter = FollowRequestsAdapter(pendingRequests) { user, action ->
-            val currentUser = authManager.getCurrentUser()
-            if (currentUser != null) {
-                when (action) {
-                    "accept" -> {
-                        followManager.acceptFollowRequest(user.userId, currentUser.userId, this) { success, message ->
-                            if (success) {
-                                pendingRequests.remove(user)
-                                requestsAdapter.notifyDataSetChanged()
-                            }
-                        }
-                    }
-                    "reject" -> {
-                        followManager.rejectFollowRequest(user.userId, currentUser.userId, this) { success, message ->
-                            if (success) {
-                                pendingRequests.remove(user)
-                                requestsAdapter.notifyDataSetChanged()
-                            }
-                        }
-                    }
-                }
-            }
+            // TODO: Implement accept/reject follow request API
+            Toast.makeText(this, "Follow requests feature coming soon", Toast.LENGTH_SHORT).show()
         }
         requestsRecyclerView.adapter = requestsAdapter
     }
     
     private fun loadPendingFollowRequests() {
-        try {
-            val currentUser = authManager.getCurrentUser()
-            if (currentUser != null) {
-                followManager.getPendingFollowRequests(currentUser.userId) { requests ->
-                    runOnUiThread {
-                        pendingRequests.clear()
-                        pendingRequests.addAll(requests)
-                        requestsAdapter.notifyDataSetChanged()
-                    }
-                }
-            }
-        } catch (e: Exception) {
-            Toast.makeText(this, "Demo mode - No follow requests", Toast.LENGTH_SHORT).show()
-        }
+        // TODO: Implement follow requests API endpoint
+        // For now, show empty list
+        android.util.Log.d("FollowRequests", "Follow requests feature to be implemented")
     }
 }
