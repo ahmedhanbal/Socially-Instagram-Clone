@@ -11,6 +11,7 @@ import android.view.Gravity
 import com.google.firebase.FirebaseApp
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.database.FirebaseDatabase
+import com.hans.i221271_i220889.network.SessionManager
 
 class MainActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -23,7 +24,7 @@ class MainActivity : Activity() {
             // Create a simple splash screen programmatically
             createSimpleSplashScreen()
 
-            // Splash screen with 1-second delay - check login status
+            // Splash screen with 5-second delay as per requirements - check login status
             Handler(Looper.getMainLooper()).postDelayed({
                 try {
                     checkUserAndNavigate()
@@ -36,7 +37,7 @@ class MainActivity : Activity() {
                     startActivity(intent)
                     finish()
                 }
-            }, 1000) // 1000 ms = 1 second
+            }, 5000) // 5000 ms = 5 seconds
         } catch (e: Exception) {
             android.util.Log.e("MainActivity", "Error in onCreate", e)
             finish()
@@ -44,53 +45,27 @@ class MainActivity : Activity() {
     }
     
     private fun checkUserAndNavigate() {
-        val auth = FirebaseAuth.getInstance()
-        val currentUser = auth.currentUser
+        val sessionManager = SessionManager(this)
         
-        if (currentUser != null) {
-            // User is logged in - check if profile is complete
-            android.util.Log.d("MainActivity", "User is logged in, checking profile...")
+        if (sessionManager.isLoggedIn()) {
+            // User is logged in - check if profile setup is complete
+            android.util.Log.d("MainActivity", "User is logged in")
             
-            // Check if user has profile data in Firebase
-            FirebaseDatabase.getInstance().reference
-                .child("users")
-                .child(currentUser.uid)
-                .get()
-                .addOnSuccessListener { snapshot ->
-                    if (snapshot.exists()) {
-                        val user = snapshot.getValue(com.hans.i221271_i220889.models.User::class.java)
-                        // If user exists and has username, profile is complete - go to HomeScreen
-                        if (user != null && user.username.isNotEmpty()) {
-                            android.util.Log.d("MainActivity", "Profile complete - going to HomeScreen")
-                            val intent = Intent(this, HomeScreen::class.java)
-                            intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_NEW_TASK)
-                            startActivity(intent)
-                            finish()
-                        } else {
-                            // Profile incomplete - go to signup (profile setup)
-                            android.util.Log.d("MainActivity", "Profile incomplete - going to signup")
-                            val intent = Intent(this, signup::class.java)
-                            intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_NEW_TASK)
-                            startActivity(intent)
-                            finish()
-                        }
-                    } else {
-                        // User doesn't exist in database - go to signup (profile setup)
-                        android.util.Log.d("MainActivity", "User not in database - going to signup")
-                        val intent = Intent(this, signup::class.java)
-                        intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_NEW_TASK)
-                        startActivity(intent)
-                        finish()
-                    }
-                }
-                .addOnFailureListener {
-                    // Error checking profile - go to login
-                    android.util.Log.e("MainActivity", "Error checking profile: ${it.message}")
-                    val intent = Intent(this, LoginActivity::class.java)
-                    intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_NEW_TASK)
-                    startActivity(intent)
-                    finish()
-                }
+            if (sessionManager.isFirstTime()) {
+                // First time user - needs profile setup (though signup already does this now)
+                android.util.Log.d("MainActivity", "First time user - profile setup needed")
+                val intent = Intent(this, signup::class.java)
+                intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_NEW_TASK)
+                startActivity(intent)
+                finish()
+            } else {
+                // Profile complete - go to home screen
+                android.util.Log.d("MainActivity", "Profile complete - going to HomeScreen")
+                val intent = Intent(this, HomeScreen::class.java)
+                intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_NEW_TASK)
+                startActivity(intent)
+                finish()
+            }
         } else {
             // User is not logged in - go to login
             android.util.Log.d("MainActivity", "User not logged in - going to LoginActivity")
