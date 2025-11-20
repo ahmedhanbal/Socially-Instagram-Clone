@@ -39,9 +39,10 @@ class NotificationRepository(private val context: Context) {
      */
     suspend fun markAsRead(notificationId: Int): Result<Boolean> = withContext(Dispatchers.IO) {
         try {
+            val request = com.hans.i221271_i220889.network.MarkNotificationReadRequest(notificationId = notificationId)
             val response = ApiClient.apiService.markNotificationRead(
                 token = sessionManager.getAuthHeader(),
-                notificationId = notificationId
+                body = request
             )
             
             if (response.isSuccessful && response.body()?.isSuccess() == true) {

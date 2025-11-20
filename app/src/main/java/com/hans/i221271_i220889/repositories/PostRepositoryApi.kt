@@ -125,13 +125,15 @@ class PostRepositoryApi(private val context: Context) {
      */
     suspend fun toggleLike(postId: Int): Result<Boolean> = withContext(Dispatchers.IO) {
         try {
+            val request = com.hans.i221271_i220889.network.ToggleLikeRequest(postId = postId)
             val response = ApiClient.apiService.toggleLike(
                 token = sessionManager.getAuthHeader(),
-                postId = postId
+                body = request
             )
             
             if (response.isSuccessful && response.body()?.isSuccess() == true) {
-                val isLiked = response.body()?.data?.get("is_liked") as? Boolean ?: false
+                val status = response.body()?.data?.get("status") as? String
+                val isLiked = status == "liked"
                 Result.success(isLiked)
             } else {
                 Result.failure(Exception(response.body()?.message ?: "Failed to toggle like"))

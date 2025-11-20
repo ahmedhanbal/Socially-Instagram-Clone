@@ -16,9 +16,10 @@ class FollowRepository(private val context: Context) {
      */
     suspend fun sendFollowRequest(followingId: Int): Result<FollowData> = withContext(Dispatchers.IO) {
         try {
+            val request = com.hans.i221271_i220889.network.SendFollowRequest(followingId = followingId)
             val response = ApiClient.apiService.sendFollowRequest(
                 token = sessionManager.getAuthHeader(),
-                followingId = followingId
+                body = request
             )
             
             if (response.isSuccessful && response.body()?.isSuccess() == true) {
@@ -38,10 +39,13 @@ class FollowRepository(private val context: Context) {
      */
     suspend fun respondToFollowRequest(followId: Int, accept: Boolean): Result<Boolean> = withContext(Dispatchers.IO) {
         try {
-            val response = ApiClient.apiService.respondFollowRequest(
-                token = sessionManager.getAuthHeader(),
+            val request = com.hans.i221271_i220889.network.RespondFollowRequest(
                 followId = followId,
                 action = if (accept) "accept" else "reject"
+            )
+            val response = ApiClient.apiService.respondFollowRequest(
+                token = sessionManager.getAuthHeader(),
+                body = request
             )
             
             if (response.isSuccessful && response.body()?.isSuccess() == true) {
@@ -133,9 +137,10 @@ class FollowRepository(private val context: Context) {
      */
     suspend fun unfollow(followingId: Int): Result<Boolean> = withContext(Dispatchers.IO) {
         try {
+            val request = com.hans.i221271_i220889.network.UnfollowRequest(followingId = followingId)
             val response = ApiClient.apiService.unfollow(
                 token = sessionManager.getAuthHeader(),
-                followingId = followingId
+                body = request
             )
             
             if (response.isSuccessful && response.body()?.isSuccess() == true) {

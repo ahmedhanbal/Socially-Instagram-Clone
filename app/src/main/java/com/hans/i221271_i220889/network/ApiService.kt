@@ -26,17 +26,14 @@ interface ApiService {
     // ==================== PROFILE ====================
     @GET("routes/profile/get_profile.php")
     suspend fun getProfile(
-        @Query("user_id") userId: Int,
-        @Header("Authorization") token: String
+        @Header("Authorization") token: String,
+        @Query("user_id") userId: Int
     ): Response<ApiResponse<UserProfileData>>
     
     @POST("routes/profile/update_profile.php")
-    @FormUrlEncoded
     suspend fun updateProfile(
         @Header("Authorization") token: String,
-        @Field("full_name") fullName: String?,
-        @Field("bio") bio: String?,
-        @Field("is_private") isPrivate: Boolean?
+        @Body body: UpdateProfileRequest
     ): Response<ApiResponse<UserProfileData>>
     
     @Multipart
@@ -88,10 +85,9 @@ interface ApiService {
     ): Response<ApiResponse<List<PostData>>>
     
     @POST("routes/posts/toggle_like.php")
-    @FormUrlEncoded
     suspend fun toggleLike(
         @Header("Authorization") token: String,
-        @Field("post_id") postId: Int
+        @Body body: ToggleLikeRequest
     ): Response<ApiResponse<Map<String, Any>>>
     
     @GET("routes/posts/comments.php")
@@ -101,11 +97,9 @@ interface ApiService {
     ): Response<ApiResponse<List<CommentData>>>
     
     @POST("routes/posts/comments.php")
-    @FormUrlEncoded
     suspend fun addComment(
         @Header("Authorization") token: String,
-        @Field("post_id") postId: Int,
-        @Field("comment_text") commentText: String
+        @Body body: AddCommentRequest
     ): Response<ApiResponse<CommentData>>
     
     // ==================== MESSAGES ====================
@@ -129,41 +123,34 @@ interface ApiService {
     ): Response<ApiResponse<List<MessageData>>>
     
     @PUT("routes/messages/edit_message.php")
-    @FormUrlEncoded
     suspend fun editMessage(
         @Header("Authorization") token: String,
-        @Field("message_id") messageId: Int,
-        @Field("message_text") messageText: String
+        @Body body: EditMessageRequest
     ): Response<ApiResponse<MessageData>>
     
     @HTTP(method = "DELETE", path = "routes/messages/delete_message.php", hasBody = true)
-    @FormUrlEncoded
     suspend fun deleteMessage(
         @Header("Authorization") token: String,
-        @Field("message_id") messageId: Int
+        @Body body: DeleteMessageRequest
     ): Response<ApiResponse<Any>>
     
     @POST("routes/messages/mark_seen.php")
-    @FormUrlEncoded
     suspend fun markMessagesSeen(
         @Header("Authorization") token: String,
-        @Field("other_user_id") otherUserId: Int
+        @Body body: MarkSeenRequest
     ): Response<ApiResponse<Any>>
     
     // ==================== FOLLOWS ====================
     @POST("routes/follows/send_request.php")
-    @FormUrlEncoded
     suspend fun sendFollowRequest(
         @Header("Authorization") token: String,
-        @Field("following_id") followingId: Int
+        @Body body: SendFollowRequest
     ): Response<ApiResponse<FollowData>>
     
     @POST("routes/follows/respond_request.php")
-    @FormUrlEncoded
     suspend fun respondFollowRequest(
         @Header("Authorization") token: String,
-        @Field("follow_id") followId: Int,
-        @Field("action") action: String // "accept" or "reject"
+        @Body body: RespondFollowRequest
     ): Response<ApiResponse<Any>>
     
     @GET("routes/follows/list_relations.php")
@@ -174,10 +161,9 @@ interface ApiService {
     ): Response<ApiResponse<List<FollowData>>>
     
     @HTTP(method = "DELETE", path = "routes/follows/unfollow.php", hasBody = true)
-    @FormUrlEncoded
     suspend fun unfollow(
         @Header("Authorization") token: String,
-        @Field("following_id") followingId: Int
+        @Body body: UnfollowRequest
     ): Response<ApiResponse<Any>>
     
     // ==================== NOTIFICATIONS ====================
@@ -189,22 +175,15 @@ interface ApiService {
     ): Response<ApiResponse<List<NotificationData>>>
     
     @POST("routes/notifications/mark_read.php")
-    @FormUrlEncoded
     suspend fun markNotificationRead(
         @Header("Authorization") token: String,
-        @Field("notification_id") notificationId: Int
+        @Body body: MarkNotificationReadRequest
     ): Response<ApiResponse<Any>>
     
     @POST("routes/notifications/push_event.php")
-    @FormUrlEncoded
     suspend fun pushNotificationEvent(
         @Header("Authorization") token: String,
-        @Field("user_id") userId: Int,
-        @Field("type") type: String,
-        @Field("title") title: String,
-        @Field("message") message: String,
-        @Field("related_user_id") relatedUserId: Int?,
-        @Field("related_item_id") relatedItemId: Int?
+        @Body body: PushNotificationRequest
     ): Response<ApiResponse<Any>>
     
     // ==================== SEARCH ====================
@@ -217,10 +196,9 @@ interface ApiService {
     
     // ==================== STATUS ====================
     @POST("routes/status/update_status.php")
-    @FormUrlEncoded
     suspend fun updateStatus(
         @Header("Authorization") token: String,
-        @Field("is_online") isOnline: Boolean
+        @Body body: UpdateStatusRequest
     ): Response<ApiResponse<Any>>
     
     @GET("routes/status/get_status.php")
@@ -231,11 +209,9 @@ interface ApiService {
     
     // ==================== SECURITY ====================
     @POST("routes/security/report_screenshot.php")
-    @FormUrlEncoded
     suspend fun reportScreenshot(
         @Header("Authorization") token: String,
-        @Field("reported_user_id") reportedUserId: Int,
-        @Field("chat_context") chatContext: String?
+        @Body body: ReportScreenshotRequest
     ): Response<ApiResponse<Any>>
 }
 

@@ -135,10 +135,13 @@ class MessageRepository(private val context: Context) {
      */
     suspend fun editMessage(messageId: Int, newText: String): Result<MessageData> = withContext(Dispatchers.IO) {
         try {
-            val response = ApiClient.apiService.editMessage(
-                token = sessionManager.getAuthHeader(),
+            val request = com.hans.i221271_i220889.network.EditMessageRequest(
                 messageId = messageId,
                 messageText = newText
+            )
+            val response = ApiClient.apiService.editMessage(
+                token = sessionManager.getAuthHeader(),
+                body = request
             )
             
             if (response.isSuccessful && response.body()?.isSuccess() == true) {
@@ -158,9 +161,10 @@ class MessageRepository(private val context: Context) {
      */
     suspend fun deleteMessage(messageId: Int): Result<Boolean> = withContext(Dispatchers.IO) {
         try {
+            val request = com.hans.i221271_i220889.network.DeleteMessageRequest(messageId = messageId)
             val response = ApiClient.apiService.deleteMessage(
                 token = sessionManager.getAuthHeader(),
-                messageId = messageId
+                body = request
             )
             
             if (response.isSuccessful && response.body()?.isSuccess() == true) {

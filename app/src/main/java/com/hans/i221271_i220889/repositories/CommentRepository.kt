@@ -38,10 +38,13 @@ class CommentRepository(private val context: Context) {
      */
     suspend fun addComment(postId: Int, commentText: String): Result<CommentData> = withContext(Dispatchers.IO) {
         try {
-            val response = ApiClient.apiService.addComment(
-                token = sessionManager.getAuthHeader(),
+            val request = com.hans.i221271_i220889.network.AddCommentRequest(
                 postId = postId,
                 commentText = commentText
+            )
+            val response = ApiClient.apiService.addComment(
+                token = sessionManager.getAuthHeader(),
+                body = request
             )
             
             if (response.isSuccessful && response.body()?.isSuccess() == true) {

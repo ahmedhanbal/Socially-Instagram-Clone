@@ -51,11 +51,14 @@ class ProfileRepository(private val context: Context) {
         isPrivate: Boolean?
     ): Result<UserProfileData> = withContext(Dispatchers.IO) {
         try {
-            val response = ApiClient.apiService.updateProfile(
-                token = sessionManager.getAuthHeader(),
+            val request = com.hans.i221271_i220889.network.UpdateProfileRequest(
                 fullName = fullName,
                 bio = bio,
                 isPrivate = isPrivate
+            )
+            val response = ApiClient.apiService.updateProfile(
+                token = sessionManager.getAuthHeader(),
+                body = request
             )
             
             if (response.isSuccessful && response.body()?.isSuccess() == true) {

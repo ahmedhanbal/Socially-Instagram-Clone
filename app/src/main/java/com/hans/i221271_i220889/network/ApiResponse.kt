@@ -22,7 +22,7 @@ data class ApiResponse<T>(
     fun isError(): Boolean = status == "error"
 }
 
-// Request bodies
+// ==================== REQUEST BODIES ====================
 data class SignupRequest(
     @SerializedName("username")
     val username: String,
@@ -46,6 +46,104 @@ data class LoginRequest(
     
     @SerializedName("fcm_token")
     val fcmToken: String? = null
+)
+
+data class UpdateProfileRequest(
+    @SerializedName("full_name")
+    val fullName: String? = null,
+    
+    @SerializedName("bio")
+    val bio: String? = null,
+    
+    @SerializedName("is_private")
+    val isPrivate: Boolean? = null
+)
+
+data class ToggleLikeRequest(
+    @SerializedName("post_id")
+    val postId: Int
+)
+
+data class AddCommentRequest(
+    @SerializedName("post_id")
+    val postId: Int,
+    
+    @SerializedName("comment_text")
+    val commentText: String
+)
+
+data class EditMessageRequest(
+    @SerializedName("message_id")
+    val messageId: Int,
+    
+    @SerializedName("message_text")
+    val messageText: String
+)
+
+data class DeleteMessageRequest(
+    @SerializedName("message_id")
+    val messageId: Int
+)
+
+data class MarkSeenRequest(
+    @SerializedName("other_user_id")
+    val otherUserId: Int
+)
+
+data class SendFollowRequest(
+    @SerializedName("following_id")
+    val followingId: Int
+)
+
+data class RespondFollowRequest(
+    @SerializedName("follow_id")
+    val followId: Int,
+    
+    @SerializedName("action")
+    val action: String
+)
+
+data class UnfollowRequest(
+    @SerializedName("following_id")
+    val followingId: Int
+)
+
+data class MarkNotificationReadRequest(
+    @SerializedName("notification_id")
+    val notificationId: Int
+)
+
+data class PushNotificationRequest(
+    @SerializedName("user_id")
+    val userId: Int,
+    
+    @SerializedName("type")
+    val type: String,
+    
+    @SerializedName("title")
+    val title: String,
+    
+    @SerializedName("message")
+    val message: String,
+    
+    @SerializedName("related_user_id")
+    val relatedUserId: Int? = null,
+    
+    @SerializedName("related_item_id")
+    val relatedItemId: Int? = null
+)
+
+data class UpdateStatusRequest(
+    @SerializedName("is_online")
+    val isOnline: Boolean
+)
+
+data class ReportScreenshotRequest(
+    @SerializedName("reported_user_id")
+    val reportedUserId: Int,
+    
+    @SerializedName("chat_context")
+    val chatContext: String? = null
 )
 
 // Auth related responses
