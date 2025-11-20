@@ -157,7 +157,7 @@ class HomeScreen : AppCompatActivity() {
     private fun setupPostsRecyclerView() {
         try {
         postsRecyclerView = findViewById(R.id.postsRecyclerView)
-        postAdapter = PostAdapter(posts) { post ->
+        postAdapter = PostAdapter(posts, postRepository, sessionManager, lifecycleScope) { post ->
             // Handle comment click
             val intentComments = Intent(this, CommentsActivity::class.java)
             intentComments.putExtra("post", post)

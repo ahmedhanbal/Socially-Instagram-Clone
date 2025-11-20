@@ -12,12 +12,16 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.hans.i221271_i220889.adapters.PostAdapter
 import com.hans.i221271_i220889.models.Post
-import com.hans.i221271_i220889.utils.PostRepository
-import com.google.firebase.auth.FirebaseAuth
+import com.hans.i221271_i220889.repositories.PostRepositoryApi
+import com.hans.i221271_i220889.network.SessionManager
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.launch
+import android.widget.Toast
 
 class PostsActivity : AppCompatActivity() {
     
-    private lateinit var postRepository: PostRepository
+    private lateinit var postRepository: PostRepositoryApi
+    private lateinit var sessionManager: SessionManager
     private lateinit var postsRecyclerView: RecyclerView
     private lateinit var postAdapter: PostAdapter
     private val posts = mutableListOf<Post>()
@@ -37,8 +41,9 @@ class PostsActivity : AppCompatActivity() {
         // Get userId from intent
         targetUserId = intent.getStringExtra("userId")
         
-        // Initialize post repository
-        postRepository = PostRepository()
+        // Initialize repositories
+        sessionManager = SessionManager(this)
+        postRepository = PostRepositoryApi(this)
         
         // Setup UI
         setupPostsRecyclerView()
@@ -61,7 +66,7 @@ class PostsActivity : AppCompatActivity() {
         postsRecyclerView = findViewById(R.id.postsRecyclerView)
         // Use LinearLayoutManager for vertical list view
         postsRecyclerView.layoutManager = LinearLayoutManager(this, LinearLayoutManager.VERTICAL, false)
-        postAdapter = PostAdapter(posts) { post ->
+        postAdapter = PostAdapter(posts, postRepository, sessionManager, lifecycleScope) { post ->
             // Handle post click - open comments
             val intentComments = Intent(this, CommentsActivity::class.java)
             intentComments.putExtra("post", post)
@@ -73,10 +78,25 @@ class PostsActivity : AppCompatActivity() {
     private fun loadUserPosts() {
         if (targetUserId == null) return
         
-        postRepository.getUserPosts(targetUserId!!) { userPosts ->
-            runOnUiThread {
+        lifecycleScope.launch {
+            val result = postRepository.getUserPosts(targetUserId!!.toIntOrNull() ?: return@launch)
+            result.onSuccess { postDataList ->
                 posts.clear()
-                posts.addAll(userPosts)
+                postDataList.forEach { postData ->
+                    posts.add(Post(
+                        postId = postData.id.toString(),
+                        userId = postData.userId.toString(),
+                        username = postData.username,
+                        userProfileImageBase64 = postData.profilePicture ?: "",
+                        caption = postData.caption ?: "",
+                        imageBase64 = postData.mediaUrl ?: "",
+                        videoBase64 = if (postData.mediaType == "video") postData.mediaUrl ?: "" else "",
+                        timestamp = System.currentTimeMillis(),
+                        likesCount = postData.likesCount,
+                        commentsCount = postData.commentsCount,
+                        isLikedByCurrentUser = postData.isLiked
+                    ))
+                }
                 postAdapter.notifyDataSetChanged()
                 
                 // Update title with post count

@@ -80,7 +80,7 @@ class UserProfile : AppCompatActivity() {
         postsRecyclerView = findViewById(R.id.postsRecyclerView)
         // Use GridLayoutManager for grid view
         postsRecyclerView.layoutManager = GridLayoutManager(this, 3)
-        postAdapter = PostAdapter(posts) { post ->
+        postAdapter = PostAdapter(posts, postRepository, sessionManager, lifecycleScope) { post ->
             // Handle post click - open comments
             val intentComments = Intent(this, CommentsActivity::class.java)
             intentComments.putExtra("post", post)
