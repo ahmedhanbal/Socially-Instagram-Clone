@@ -19,13 +19,16 @@ import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import android.view.View
 import com.hans.i221271_i220889.utils.Base64Image
-import com.hans.i221271_i220889.utils.FirebaseAuthManager
-import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.database.FirebaseDatabase
+import com.hans.i221271_i220889.network.SessionManager
+import com.hans.i221271_i220889.repositories.StoryRepository
+import com.hans.i221271_i220889.offline.NetworkHelper
+import com.hans.i221271_i220889.offline.OfflineHelper
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.launch
 
 class storyUpload : AppCompatActivity() {
-    private val database: FirebaseDatabase = FirebaseDatabase.getInstance()
-    private val authManager = FirebaseAuthManager()
+    private lateinit var storyRepository: StoryRepository
+    private lateinit var sessionManager: SessionManager
     private var selectedImageUri: Uri? = null
     private lateinit var previewImageView: ImageView
     private lateinit var galleryRecyclerView: RecyclerView
@@ -34,6 +37,10 @@ class storyUpload : AppCompatActivity() {
     
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        
+        // Initialize repositories
+        storyRepository = StoryRepository(this)
+        sessionManager = SessionManager(this)
         
         // Check and request permissions
         if (checkPermissions()) {
@@ -318,9 +325,7 @@ class storyUpload : AppCompatActivity() {
     }
     
     private fun uploadStory() {
-        val currentUser = FirebaseAuth.getInstance().currentUser
-        
-        if (currentUser == null) {
+        if (!sessionManager.isLoggedIn()) {
             Toast.makeText(this, "Please login first", Toast.LENGTH_SHORT).show()
             return
         }
@@ -330,42 +335,55 @@ class storyUpload : AppCompatActivity() {
             return
         }
         
-        val base64 = Base64Image.uriToBase64(this, selectedImageUri!!, 70)
-        if (base64 != null) {
-            val storyId = database.reference.child("stories").push().key
-            if (storyId != null) {
-                authManager.getUserData(currentUser.uid) { userData ->
-                    val username = userData?.username ?: currentUser.email ?: "User"
-                    val profileImageBase64 = userData?.profileImageBase64 ?: ""
+        val progressDialog = android.app.ProgressDialog(this).apply {
+            setMessage("Uploading story...")
+            setCancelable(false)
+            show()
+        }
+        
+        lifecycleScope.launch {
+            try {
+                if (NetworkHelper.isOnline(this@storyUpload)) {
+                    // Online - upload directly
+                    val result = storyRepository.createStory(selectedImageUri!!, "image")
                     
-                    val currentTime = System.currentTimeMillis()
-                    val expiryTime = currentTime + (24L * 60 * 60 * 1000)
+                    progressDialog.dismiss()
                     
-                    val storyData = mapOf(
-                        "storyId" to storyId,
-                        "userId" to currentUser.uid,
-                        "username" to username,
-                        "userProfileImageBase64" to profileImageBase64,
-                        "imageBase64" to base64,
-                        "timestamp" to currentTime,
-                        "expiresAt" to expiryTime
-                    )
+                    result.onSuccess {
+                        Toast.makeText(this@storyUpload, "Story uploaded! Expires in 24 hours", Toast.LENGTH_LONG).show()
+                        setResult(RESULT_OK)
+                        finish()
+                    }.onFailure { error ->
+                        Toast.makeText(this@storyUpload, "Upload failed: ${error.message}", Toast.LENGTH_SHORT).show()
+                    }
+                } else {
+                    // Offline - queue for later
+                    progressDialog.dismiss()
                     
-                    database.reference.child("stories").child(storyId).setValue(storyData)
-                        .addOnSuccessListener {
-                            database.reference.child("users").child(currentUser.uid)
-                                .child("stories").child(storyId).setValue(true)
-                            
-                            Toast.makeText(this, "Story uploaded! Expires in 24 hours", Toast.LENGTH_LONG).show()
-                            finish()
+                    // Save to temp file for queue
+                    val tempFile = java.io.File.createTempFile("story_", ".jpg", cacheDir)
+                    contentResolver.openInputStream(selectedImageUri!!)?.use { input ->
+                        tempFile.outputStream().use { output ->
+                            input.copyTo(output)
                         }
-                        .addOnFailureListener {
-                            Toast.makeText(this, "Upload failed: ${it.message}", Toast.LENGTH_SHORT).show()
-                        }
+                    }
+                    
+                    val queueManager = OfflineHelper.getQueueManager(this@storyUpload)
+                    queueManager.queueCreateStory(tempFile.absolutePath, "image")
+                    
+                    Toast.makeText(
+                        this@storyUpload,
+                        "Offline: Story queued, will upload when online",
+                        Toast.LENGTH_LONG
+                    ).show()
+                    
+                    setResult(RESULT_OK)
+                    finish()
                 }
+            } catch (e: Exception) {
+                progressDialog.dismiss()
+                Toast.makeText(this@storyUpload, "Error: ${e.message}", Toast.LENGTH_SHORT).show()
             }
-        } else {
-            Toast.makeText(this, "Failed to process image", Toast.LENGTH_SHORT).show()
         }
     }
     
