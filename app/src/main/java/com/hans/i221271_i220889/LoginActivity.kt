@@ -9,7 +9,6 @@ import androidx.core.view.WindowInsetsCompat
 import android.content.Intent
 import android.widget.Button
 import com.google.android.material.textfield.TextInputEditText
-import com.hans.i221271_i220889.utils.FirebaseAuthManager
 import com.hans.i221271_i220889.network.ApiClient
 import com.hans.i221271_i220889.network.SessionManager
 import kotlinx.coroutines.CoroutineScope
