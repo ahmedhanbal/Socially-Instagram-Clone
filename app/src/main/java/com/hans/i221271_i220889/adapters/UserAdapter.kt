@@ -33,7 +33,17 @@ class UserAdapter(
         val user = users[position]
         
         holder.usernameText.text = user.username
-        holder.userStatusText.text = user.fullName.ifEmpty { if (user.isOnline) "Online" else "Offline" }
+        // Show full name if available, otherwise show online/offline status
+        val statusText = if (user.fullName.isNotEmpty()) {
+            if (user.isOnline) {
+                "${user.fullName} • Online"
+            } else {
+                "${user.fullName} • Offline"
+            }
+        } else {
+            if (user.isOnline) "Online" else "Offline"
+        }
+        holder.userStatusText.text = statusText
         
         // Set profile image (URL or Base64)
         val profileImage = user.profilePicture.ifEmpty { 

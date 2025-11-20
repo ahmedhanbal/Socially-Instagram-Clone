@@ -45,7 +45,7 @@
         app:layout_constraintTop_toBottomOf="@id/story_line"
         android:textStyle="bold"
         android:textSize="18sp"
-        android:text="Sofia"
+        android:text="Sof"
         android:textColor="@color/white"
         android:layout_margin="16dp"/>
 

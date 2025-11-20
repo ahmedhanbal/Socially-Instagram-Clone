@@ -83,19 +83,21 @@ class PostsActivity : AppCompatActivity() {
             result.onSuccess { postDataList ->
                 posts.clear()
                 postDataList.forEach { postData ->
-                    posts.add(Post(
-                        postId = postData.id.toString(),
-                        userId = postData.userId.toString(),
-                        username = postData.username,
-                        userProfileImageBase64 = postData.profilePicture ?: "",
-                        caption = postData.caption ?: "",
-                        imageBase64 = postData.mediaUrl ?: "",
-                        videoBase64 = if (postData.mediaType == "video") postData.mediaUrl ?: "" else "",
-                        timestamp = System.currentTimeMillis(),
-                        likesCount = postData.likesCount,
-                        commentsCount = postData.commentsCount,
-                        isLikedByCurrentUser = postData.isLiked
-                    ))
+                    posts.add(
+                        Post(
+                            postId = postData.id.toString(),
+                            userId = postData.userId.toString(),
+                            username = postData.username,
+                            userProfileImage = postData.profilePicture ?: "",
+                            caption = postData.caption ?: "",
+                            imageUrl = postData.mediaUrl ?: "",
+                            videoBase64 = if (postData.mediaType == "video") postData.mediaUrl ?: "" else "",
+                            timestamp = System.currentTimeMillis(),
+                            likesCount = postData.likesCount,
+                            commentsCount = postData.commentsCount,
+                            isLikedByCurrentUser = postData.isLiked
+                        )
+                    )
                 }
                 postAdapter.notifyDataSetChanged()
                 

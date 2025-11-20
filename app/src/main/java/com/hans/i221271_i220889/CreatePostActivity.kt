@@ -1,303 +1,140 @@
 package com.hans.i221271_i220889
 
 import android.Manifest
+import android.app.ProgressDialog
+import android.content.Intent
 import android.content.pm.PackageManager
-import android.database.Cursor
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.provider.MediaStore
-import android.widget.*
-import android.view.Gravity
-import android.view.ViewGroup
-import android.graphics.Color
+import android.widget.Button
+import android.widget.EditText
+import android.widget.ImageButton
+import android.widget.ImageView
+import android.widget.Toast
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
-import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
-import androidx.recyclerview.widget.GridLayoutManager
-import androidx.recyclerview.widget.RecyclerView
-import android.view.LayoutInflater
-import android.view.View
-import com.hans.i221271_i220889.repositories.PostRepositoryApi
+import androidx.lifecycle.lifecycleScope
 import com.hans.i221271_i220889.network.SessionManager
 import com.hans.i221271_i220889.offline.NetworkHelper
 import com.hans.i221271_i220889.offline.OfflineHelper
-import androidx.lifecycle.lifecycleScope
+import com.hans.i221271_i220889.repositories.PostRepositoryApi
 import kotlinx.coroutines.launch
 
-/**
- * Instagram-style Create Post Activity
- * - Select photos from gallery with grid view
- * - Add caption
- * - Upload with preview
- */
 class CreatePostActivity : AppCompatActivity() {
-    
+
     private lateinit var postRepository: PostRepositoryApi
     private lateinit var sessionManager: SessionManager
-    private var selectedImageUri: Uri? = null
-    private lateinit var previewImageView: ImageView
-    private lateinit var galleryRecyclerView: RecyclerView
-    private val galleryImages = mutableListOf<Uri>()
     private lateinit var captionInput: EditText
-    private val PERMISSION_REQUEST_CODE = 101
-    
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        
-        postRepository = PostRepositoryApi(this)
-        sessionManager = SessionManager(this)
-        
-        if (checkPermissions()) {
-            createInstagramStyleUI()
-            loadGalleryImages()
-        } else {
-            requestPermissions()
+    private lateinit var imagePreview: ImageView
+    private lateinit var selectImageBtn: Button
+    private lateinit var createPostBtn: Button
+    private lateinit var backBtn: ImageButton
+
+    private var selectedImageUri: Uri? = null
+
+    private val imagePickerLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == RESULT_OK) {
+            val uri = result.data?.data
+            if (uri != null) {
+                selectedImageUri = uri
+                imagePreview.setImageURI(uri)
+                imagePreview.visibility = ImageView.VISIBLE
+            }
         }
     }
-    
-    private fun checkPermissions(): Boolean {
-        return if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
-            ContextCompat.checkSelfPermission(this, Manifest.permission.READ_MEDIA_IMAGES) == PackageManager.PERMISSION_GRANTED
-        } else {
-            ContextCompat.checkSelfPermission(this, Manifest.permission.READ_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED
-        }
-    }
-    
-    private fun requestPermissions() {
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
-            ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.READ_MEDIA_IMAGES), PERMISSION_REQUEST_CODE)
-        } else {
-            ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE), PERMISSION_REQUEST_CODE)
-        }
-    }
-    
-    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        if (requestCode == PERMISSION_REQUEST_CODE && grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-            createInstagramStyleUI()
-            loadGalleryImages()
+
+    private val permissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) {
+            openGallery()
         } else {
             Toast.makeText(this, "Permission required to select photos", Toast.LENGTH_LONG).show()
-            finish()
         }
     }
-    
-    private fun createInstagramStyleUI() {
-        val mainLayout = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setBackgroundColor(Color.WHITE)
-            layoutParams = ViewGroup.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.MATCH_PARENT
-            )
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        setContentView(R.layout.activity_create_post)
+
+        postRepository = PostRepositoryApi(this)
+        sessionManager = SessionManager(this)
+
+        captionInput = findViewById(R.id.captionInput)
+        imagePreview = findViewById(R.id.imagePreview)
+        selectImageBtn = findViewById(R.id.selectImageBtn)
+        createPostBtn = findViewById(R.id.createPostBtn)
+        backBtn = findViewById(R.id.backBtn)
+
+        backBtn.setOnClickListener { finish() }
+        selectImageBtn.setOnClickListener { checkPermissionAndPickImage() }
+        createPostBtn.setOnClickListener { createPost() }
+    }
+
+    private fun checkPermissionAndPickImage() {
+        val permission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            Manifest.permission.READ_MEDIA_IMAGES
+        } else {
+            Manifest.permission.READ_EXTERNAL_STORAGE
         }
-        
-        // ===== TOP BAR (Instagram Style) =====
-        val topBar = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            setPadding(15, 60, 15, 15)
-            setBackgroundColor(Color.WHITE)
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            )
-        }
-        
-        val backButton = TextView(this).apply {
-            text = "✕"
-            textSize = 24f
-            setTextColor(Color.BLACK)
-            gravity = Gravity.START
-            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
-            setOnClickListener { finish() }
-        }
-        
-        val title = TextView(this).apply {
-            text = "New Post"
-            textSize = 18f
-            setTextColor(Color.BLACK)
-            gravity = Gravity.CENTER
-            android.graphics.Typeface.DEFAULT_BOLD
-            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 2f)
-        }
-        
-        val shareButton = TextView(this).apply {
-            text = "Share"
-            textSize = 16f
-            setTextColor(Color.parseColor("#0095F6")) // Instagram blue
-            gravity = Gravity.END
-            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
-            setOnClickListener { createPost() }
-        }
-        
-        topBar.addView(backButton)
-        topBar.addView(title)
-        topBar.addView(shareButton)
-        
-        // ===== PREVIEW & CAPTION SECTION =====
-        val contentLayout = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            setPadding(15, 15, 15, 15)
-            setBackgroundColor(Color.WHITE)
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            )
-        }
-        
-        // Selected image preview (square)
-        previewImageView = ImageView(this).apply {
-            setImageResource(R.drawable.ic_default_profile)
-            scaleType = ImageView.ScaleType.CENTER_CROP
-            setBackgroundColor(Color.parseColor("#F0F0F0"))
-            layoutParams = LinearLayout.LayoutParams(120, 120).apply {
-                marginEnd = 15
+
+        when {
+            ContextCompat.checkSelfPermission(this, permission) == PackageManager.PERMISSION_GRANTED -> {
+                openGallery()
             }
-        }
-        
-        // Caption input
-        captionInput = EditText(this).apply {
-            hint = "Write a caption..."
-            setHintTextColor(Color.parseColor("#999999"))
-            setTextColor(Color.BLACK)
-            textSize = 14f
-            setBackgroundColor(Color.TRANSPARENT)
-            setPadding(10, 10, 10, 10)
-            layoutParams = LinearLayout.LayoutParams(
-                0,
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                1f
-            )
-            gravity = Gravity.TOP
-            minLines = 3
-            maxLines = 5
-        }
-        
-        contentLayout.addView(previewImageView)
-        contentLayout.addView(captionInput)
-        
-        // Divider
-        val divider = View(this).apply {
-            setBackgroundColor(Color.parseColor("#EEEEEE"))
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                1
-            )
-        }
-        
-        // ===== GALLERY GRID =====
-        val galleryLabel = TextView(this).apply {
-            text = "Recents"
-            textSize = 14f
-            setTextColor(Color.BLACK)
-            setPadding(15, 15, 15, 10)
-            typeface = android.graphics.Typeface.DEFAULT_BOLD
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            )
-        }
-        
-        galleryRecyclerView = RecyclerView(this).apply {
-            layoutManager = GridLayoutManager(this@CreatePostActivity, 3)
-            setBackgroundColor(Color.WHITE)
-            setPadding(2, 2, 2, 2)
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                0,
-                1f
-            )
-        }
-        
-        // Add all to main layout
-        mainLayout.addView(topBar)
-        mainLayout.addView(contentLayout)
-        mainLayout.addView(divider)
-        mainLayout.addView(galleryLabel)
-        mainLayout.addView(galleryRecyclerView)
-        
-        setContentView(mainLayout)
-    }
-    
-    private fun loadGalleryImages() {
-        val imageUris = mutableListOf<Uri>()
-        
-        val projection = arrayOf(MediaStore.Images.Media._ID, MediaStore.Images.Media.DATE_ADDED)
-        val sortOrder = "${MediaStore.Images.Media.DATE_ADDED} DESC"
-        
-        val cursor: Cursor? = contentResolver.query(
-            MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
-            projection,
-            null,
-            null,
-            sortOrder
-        )
-        
-        cursor?.use {
-            val idColumn = it.getColumnIndexOrThrow(MediaStore.Images.Media._ID)
-            
-            while (it.moveToNext()) {
-                val id = it.getLong(idColumn)
-                val contentUri = Uri.withAppendedPath(
-                    MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
-                    id.toString()
-                )
-                imageUris.add(contentUri)
+            shouldShowRequestPermissionRationale(permission) -> {
+                Toast.makeText(this, "Please allow photo permission to continue", Toast.LENGTH_SHORT).show()
+                permissionLauncher.launch(permission)
             }
-        }
-        
-        galleryImages.clear()
-        galleryImages.addAll(imageUris)
-        
-        // Set adapter
-        galleryRecyclerView.adapter = GalleryAdapter(galleryImages) { uri ->
-            selectedImageUri = uri
-            previewImageView.setImageURI(uri)
-        }
-        
-        // Auto-select first image
-        if (galleryImages.isNotEmpty()) {
-            selectedImageUri = galleryImages[0]
-            previewImageView.setImageURI(galleryImages[0])
+            else -> permissionLauncher.launch(permission)
         }
     }
-    
+
+    private fun openGallery() {
+        val intent = Intent(Intent.ACTION_PICK, MediaStore.Images.Media.EXTERNAL_CONTENT_URI)
+        imagePickerLauncher.launch(intent)
+    }
+
     private fun createPost() {
         val caption = captionInput.text.toString().trim()
-        
+
         if (!sessionManager.isLoggedIn()) {
             Toast.makeText(this, "Please login first", Toast.LENGTH_SHORT).show()
             return
         }
-        
+
         if (selectedImageUri == null) {
             Toast.makeText(this, "Please select an image", Toast.LENGTH_SHORT).show()
             return
         }
-        
+
         if (caption.isEmpty()) {
             Toast.makeText(this, "Please add a caption", Toast.LENGTH_SHORT).show()
             return
         }
-        
-        val progressDialog = android.app.ProgressDialog(this).apply {
+
+        val progressDialog = ProgressDialog(this).apply {
             setMessage("Creating post...")
             setCancelable(false)
             show()
         }
-        
+
         lifecycleScope.launch {
             try {
                 if (NetworkHelper.isOnline(this@CreatePostActivity)) {
-                    // Online - create post directly
                     val result = postRepository.createPost(
                         caption = caption,
                         mediaUri = selectedImageUri,
                         mediaType = "image"
                     )
-                    
+
                     progressDialog.dismiss()
-                    
+
                     result.onSuccess {
                         Toast.makeText(this@CreatePostActivity, "Post created!", Toast.LENGTH_SHORT).show()
                         setResult(RESULT_OK)
@@ -306,26 +143,22 @@ class CreatePostActivity : AppCompatActivity() {
                         Toast.makeText(this@CreatePostActivity, "Failed: ${error.message}", Toast.LENGTH_SHORT).show()
                     }
                 } else {
-                    // Offline - queue for later
                     progressDialog.dismiss()
-                    
-                    // Save to temp file for queue
+
                     val tempFile = java.io.File.createTempFile("post_", ".jpg", cacheDir)
                     contentResolver.openInputStream(selectedImageUri!!)?.use { input ->
-                        tempFile.outputStream().use { output ->
-                            input.copyTo(output)
-                        }
+                        tempFile.outputStream().use { output -> input.copyTo(output) }
                     }
-                    
+
                     val queueManager = OfflineHelper.getQueueManager(this@CreatePostActivity)
                     queueManager.queueCreatePost(caption, tempFile.absolutePath, "image")
-                    
+
                     Toast.makeText(
                         this@CreatePostActivity,
                         "Offline: Post queued, will upload when online",
                         Toast.LENGTH_LONG
                     ).show()
-                    
+
                     setResult(RESULT_OK)
                     finish()
                 }
@@ -334,38 +167,5 @@ class CreatePostActivity : AppCompatActivity() {
                 Toast.makeText(this@CreatePostActivity, "Error: ${e.message}", Toast.LENGTH_SHORT).show()
             }
         }
-    }
-    
-    // Gallery Adapter
-    inner class GalleryAdapter(
-        private val images: List<Uri>,
-        private val onImageClick: (Uri) -> Unit
-    ) : RecyclerView.Adapter<GalleryAdapter.ViewHolder>() {
-        
-        inner class ViewHolder(view: View) : RecyclerView.ViewHolder(view) {
-            val imageView: ImageView = view.findViewById(android.R.id.icon)
-        }
-        
-        override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
-            val imageView = ImageView(parent.context).apply {
-                id = android.R.id.icon
-                scaleType = ImageView.ScaleType.CENTER_CROP
-                setPadding(2, 2, 2, 2)
-                val size = parent.width / 3
-                layoutParams = ViewGroup.LayoutParams(size, size)
-            }
-            val container = FrameLayout(parent.context).apply {
-                addView(imageView)
-            }
-            return ViewHolder(container)
-        }
-        
-        override fun onBindViewHolder(holder: ViewHolder, position: Int) {
-            val uri = images[position]
-            holder.imageView.setImageURI(uri)
-            holder.itemView.setOnClickListener { onImageClick(uri) }
-        }
-        
-        override fun getItemCount() = images.size
     }
 }

@@ -9,8 +9,12 @@ import android.os.Build
 import androidx.core.app.NotificationCompat
 import com.hans.i221271_i220889.R
 import com.hans.i221271_i220889.HomeScreen
+import com.hans.i221271_i220889.repositories.FcmRepository
 import com.google.firebase.messaging.FirebaseMessagingService
 import com.google.firebase.messaging.RemoteMessage
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 
 class MyFirebaseMessagingService : FirebaseMessagingService() {
 
@@ -56,7 +60,7 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
     }
 
     private fun showNotification(title: String, body: String, type: String) {
-        val intent = Intent(this, HomeScreen::class.java)
+        val intent = Intent(this, com.hans.i221271_i220889.Notifications::class.java)
         intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
         intent.putExtra("notification_type", type)
         
@@ -197,41 +201,12 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
     }
 
     private fun sendTokenToServer(token: String) {
-        // Save token to Firebase Database for the current user
-        val userId = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid
-        userId?.let {
-            com.google.firebase.database.FirebaseDatabase.getInstance()
-                .reference
-                .child("users")
-                .child(it)
-                .child("fcmToken")
-                .setValue(token)
-        }
-    }
-    
-    companion object {
-        fun sendNotificationToUser(userId: String, title: String, body: String, type: String, fromUserId: String? = null, fromUsername: String? = null) {
-            try {
-                val database = com.google.firebase.database.FirebaseDatabase.getInstance()
-                database.reference.child("users").child(userId).child("fcmToken").get()
-                    .addOnSuccessListener { snapshot ->
-                        val token = snapshot.getValue(String::class.java)
-                        if (token != null) {
-                            // Store notification in database for offline users
-                            val notificationData = mapOf(
-                                "title" to title,
-                                "body" to body,
-                                "type" to type,
-                                "fromUserId" to (fromUserId ?: ""),
-                                "fromUsername" to (fromUsername ?: ""),
-                                "timestamp" to System.currentTimeMillis()
-                            )
-                            
-                            database.reference.child("notifications").child(userId).push().setValue(notificationData)
-                        }
-                    }
-            } catch (e: Exception) {
-                android.util.Log.e("FCM", "Error sending notification: ${e.message}")
+        // Send token to PHP backend
+        val fcmRepository = FcmRepository(this)
+        CoroutineScope(Dispatchers.IO).launch {
+            val result = fcmRepository.updateFcmToken(token)
+            result.onFailure { error ->
+                android.util.Log.e("FCM", "Failed to update FCM token: ${error.message}")
             }
         }
     }

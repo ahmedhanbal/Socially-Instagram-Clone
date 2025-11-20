@@ -7,7 +7,6 @@ import com.hans.i221271_i220889.services.OfflineSyncService
 
 /**
  * Helper class for offline functionality
- * Use this when you want to queue actions or manually trigger sync
  */
 object OfflineHelper {
     

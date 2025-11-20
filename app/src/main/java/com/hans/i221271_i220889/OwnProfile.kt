@@ -147,9 +147,9 @@ class OwnProfile : AppCompatActivity() {
                             postId = postData.id.toString(),
                             userId = postData.userId.toString(),
                             username = postData.username,
-                            userProfileImageBase64 = postData.profilePicture ?: "",
+                            userProfileImage = postData.profilePicture ?: "",
                             caption = postData.caption ?: "",
-                            imageBase64 = postData.mediaUrl ?: "",
+                            imageUrl = postData.mediaUrl ?: "",
                             videoBase64 = if (postData.mediaType == "video") postData.mediaUrl
                                 ?: "" else "",
                             timestamp = System.currentTimeMillis(), // Would need proper parsing
@@ -228,9 +228,6 @@ class OwnProfile : AppCompatActivity() {
 
                 val usernameTextView2 = findViewById<android.widget.TextView>(R.id.header_title_2)
                 usernameTextView2.text = profile.username
-
-                val usernameTextView3 = findViewById<android.widget.TextView>(R.id.header_title_3)
-                usernameTextView3.text = "@${profile.username}"
 
                 // Update bio if exists
                 val bioTextView = findViewById<android.widget.TextView?>(R.id.bio)

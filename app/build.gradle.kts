@@ -77,6 +77,8 @@ dependencies {
     
     // Picasso for image loading with caching
     implementation("com.squareup.picasso:picasso:2.8")
+
+    implementation("androidx.swiperefreshlayout:swiperefreshlayout:1.1.0")
     
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

@@ -1,20 +1,26 @@
 package com.hans.i221271_i220889.adapters
 
+import android.content.Intent
+import android.net.Uri
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.*
+import androidx.core.content.FileProvider
 import androidx.recyclerview.widget.RecyclerView
 import com.hans.i221271_i220889.R
 import com.hans.i221271_i220889.utils.Base64Image
 import com.hans.i221271_i220889.utils.ChatMessage
+import com.hans.i221271_i220889.network.ApiConfig
+import com.squareup.picasso.Picasso
 import java.text.SimpleDateFormat
 import java.util.*
 
 class MessageAdapter(
     private val messages: MutableList<ChatMessage>,
     private val currentUserId: String,
-    private val onMessageLongClick: (ChatMessage) -> Unit
+    private val onMessageLongClick: (ChatMessage) -> Unit,
+    private val onFileClick: (ChatMessage) -> Unit = {}
 ) : RecyclerView.Adapter<MessageAdapter.MessageViewHolder>() {
 
     class MessageViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
@@ -52,12 +58,65 @@ class MessageAdapter(
             }
             "image" -> {
                 holder.messageImage.visibility = View.VISIBLE
-                holder.messageText.visibility = View.GONE
-                try {
-                    val bitmap = Base64Image.base64ToBitmap(message.content)
-                    holder.messageImage.setImageBitmap(bitmap)
-                } catch (e: Exception) {
-                    holder.messageImage.setImageResource(R.drawable.placeholder_image)
+                holder.messageText.visibility = if (message.content.isNotEmpty()) View.VISIBLE else View.GONE
+                if (message.content.isNotEmpty()) {
+                    holder.messageText.text = message.content
+                }
+
+                val mediaUrl = message.mediaUrl ?: message.content
+                if (mediaUrl.startsWith("http") || mediaUrl.startsWith("uploads/")) {
+                    // Load from URL using Picasso
+                    val imageUrl = if (mediaUrl.startsWith("http")) {
+                        mediaUrl
+                    } else {
+                        ApiConfig.BASE_URL + mediaUrl
+                    }
+                    Picasso.get()
+                        .load(imageUrl)
+                        .placeholder(R.drawable.placeholder_image)
+                        .error(R.drawable.placeholder_image)
+                        .into(holder.messageImage)
+                    
+                    // Make image clickable to open in full screen
+                    holder.messageImage.setOnClickListener {
+                        onFileClick(message)
+                    }
+                } else {
+                    // Fallback to Base64
+                    try {
+                        val bitmap = Base64Image.base64ToBitmap(mediaUrl)
+                        holder.messageImage.setImageBitmap(bitmap)
+                        holder.messageImage.setOnClickListener {
+                            onFileClick(message)
+                        }
+                    } catch (e: Exception) {
+                        holder.messageImage.setImageResource(R.drawable.placeholder_image)
+                    }
+                }
+            }
+            "video" -> {
+                holder.messageImage.visibility = View.VISIBLE
+                holder.messageText.visibility = if (message.content.isNotEmpty()) View.VISIBLE else View.GONE
+                if (message.content.isNotEmpty()) {
+                    holder.messageText.text = message.content
+                }
+                
+                // Show video icon/thumbnail (use placeholder for now, can be replaced with actual video thumbnail)
+                holder.messageImage.setImageResource(R.drawable.video_on)
+                holder.messageImage.setOnClickListener {
+                    onFileClick(message)
+                }
+            }
+            "file" -> {
+                holder.messageImage.visibility = View.VISIBLE
+                holder.messageText.visibility = View.VISIBLE
+                
+                // Show file icon and filename
+                val fileName = message.mediaUrl?.substringAfterLast("/") ?: "File"
+                holder.messageText.text = "📎 $fileName"
+                holder.messageImage.setImageResource(R.drawable.ic_more)
+                holder.messageImage.setOnClickListener {
+                    onFileClick(message)
                 }
             }
             "post" -> {

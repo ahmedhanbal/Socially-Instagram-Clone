@@ -21,10 +21,11 @@ class SearchRepository(private val context: Context) {
         filter: String? = null // "followers", "following", or null for all
     ): Result<List<UserProfileData>> = withContext(Dispatchers.IO) {
         try {
+            val sanitizedFilter = filter?.takeIf { it == "followers" || it == "following" }
             val response = ApiClient.apiService.searchUsers(
                 token = sessionManager.getAuthHeader(),
                 query = query,
-                filter = filter
+                filter = sanitizedFilter
             )
             
             if (response.isSuccessful && response.body()?.isSuccess() == true) {
@@ -66,9 +67,10 @@ class SearchRepository(private val context: Context) {
      */
     suspend fun markNotificationRead(notificationId: Int): Result<Boolean> = withContext(Dispatchers.IO) {
         try {
+            val request = com.hans.i221271_i220889.network.MarkNotificationReadRequest(notificationId = notificationId)
             val response = ApiClient.apiService.markNotificationRead(
                 token = sessionManager.getAuthHeader(),
-                notificationId = notificationId
+                body = request
             )
             
             if (response.isSuccessful && response.body()?.isSuccess() == true) {
@@ -86,9 +88,10 @@ class SearchRepository(private val context: Context) {
      */
     suspend fun updateOnlineStatus(isOnline: Boolean): Result<Boolean> = withContext(Dispatchers.IO) {
         try {
+            val request = com.hans.i221271_i220889.network.UpdateStatusRequest(isOnline = isOnline)
             val response = ApiClient.apiService.updateStatus(
                 token = sessionManager.getAuthHeader(),
-                isOnline = isOnline
+                body = request
             )
             
             if (response.isSuccessful && response.body()?.isSuccess() == true) {
@@ -129,10 +132,13 @@ class SearchRepository(private val context: Context) {
      */
     suspend fun reportScreenshot(reportedUserId: Int, chatContext: String? = null): Result<Boolean> = withContext(Dispatchers.IO) {
         try {
-            val response = ApiClient.apiService.reportScreenshot(
-                token = sessionManager.getAuthHeader(),
+            val request = com.hans.i221271_i220889.network.ReportScreenshotRequest(
                 reportedUserId = reportedUserId,
                 chatContext = chatContext
+            )
+            val response = ApiClient.apiService.reportScreenshot(
+                token = sessionManager.getAuthHeader(),
+                body = request
             )
             
             if (response.isSuccessful && response.body()?.isSuccess() == true) {

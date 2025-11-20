@@ -8,16 +8,21 @@ import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import android.content.Intent
 import android.widget.Button
+import androidx.lifecycle.lifecycleScope
 import com.google.android.material.textfield.TextInputEditText
+import com.google.firebase.messaging.FirebaseMessaging
 import com.hans.i221271_i220889.network.ApiClient
 import com.hans.i221271_i220889.network.SessionManager
+import com.hans.i221271_i220889.repositories.SearchRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
 
 class LoginActivity : AppCompatActivity() {
     private lateinit var sessionManager: SessionManager
+    private lateinit var searchRepository: SearchRepository
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -32,9 +37,14 @@ class LoginActivity : AppCompatActivity() {
         }
         
         sessionManager = SessionManager(this)
+        searchRepository = SearchRepository(this)
         
         // Check if already logged in
         if (sessionManager.isLoggedIn()) {
+            // Update status to online
+            lifecycleScope.launch {
+                searchRepository.updateOnlineStatus(true)
+            }
             navigateToHomeScreen()
             return
         }
@@ -67,10 +77,18 @@ class LoginActivity : AppCompatActivity() {
             loginButton.isEnabled = false
             CoroutineScope(Dispatchers.IO).launch {
                 try {
+                    // Get FCM token
+                    val fcmToken = try {
+                        FirebaseMessaging.getInstance().token.await()
+                    } catch (e: Exception) {
+                        android.util.Log.e("LoginActivity", "Failed to get FCM token: ${e.message}")
+                        null
+                    }
+                    
                     val request = com.hans.i221271_i220889.network.LoginRequest(
                         username = email, // Can be email or username
                         password = password,
-                        fcmToken = null // TODO: Get from FCM later
+                        fcmToken = fcmToken
                     )
                     val response = ApiClient.apiService.login(request)
                     
@@ -81,6 +99,11 @@ class LoginActivity : AppCompatActivity() {
                             if (authData != null) {
                                 // Save session
                                 sessionManager.saveSession(authData)
+                                
+                                // Update status to online after login
+                                CoroutineScope(Dispatchers.IO).launch {
+                                    searchRepository.updateOnlineStatus(true)
+                                }
                                 
                                 Toast.makeText(this@LoginActivity, "Login successful!", Toast.LENGTH_SHORT).show()
                                 navigateToHomeScreen()
@@ -120,7 +143,7 @@ class LoginActivity : AppCompatActivity() {
     private fun setupForgotPasswordButton() {
         val forgotPasswordButton = findViewById<Button>(R.id.forgotPassword)
         forgotPasswordButton?.setOnClickListener {
-            Toast.makeText(this, "Forgot password functionality coming soon", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "remember your password dummbo", Toast.LENGTH_SHORT).show()
         }
     }
 }

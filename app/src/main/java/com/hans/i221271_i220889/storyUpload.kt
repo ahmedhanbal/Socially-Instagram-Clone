@@ -24,6 +24,7 @@ import com.hans.i221271_i220889.repositories.StoryRepository
 import com.hans.i221271_i220889.offline.NetworkHelper
 import com.hans.i221271_i220889.offline.OfflineHelper
 import androidx.lifecycle.lifecycleScope
+import com.squareup.picasso.Picasso
 import kotlinx.coroutines.launch
 
 class storyUpload : AppCompatActivity() {
@@ -314,13 +315,25 @@ class storyUpload : AppCompatActivity() {
         // Set adapter
         galleryRecyclerView.adapter = GalleryAdapter(galleryImages) { uri ->
             selectedImageUri = uri
-            previewImageView.setImageURI(uri)
+            Picasso.get()
+                .load(uri)
+                .fit()
+                .centerCrop()
+                .placeholder(R.drawable.placeholder_image)
+                .error(R.drawable.placeholder_image)
+                .into(previewImageView)
         }
         
         // Auto-select first image
         if (galleryImages.isNotEmpty()) {
             selectedImageUri = galleryImages[0]
-            previewImageView.setImageURI(galleryImages[0])
+            Picasso.get()
+                .load(galleryImages[0])
+                .fit()
+                .centerCrop()
+                .placeholder(R.drawable.placeholder_image)
+                .error(R.drawable.placeholder_image)
+                .into(previewImageView)
         }
     }
     
@@ -413,7 +426,13 @@ class storyUpload : AppCompatActivity() {
         
         override fun onBindViewHolder(holder: ViewHolder, position: Int) {
             val uri = images[position]
-            holder.imageView.setImageURI(uri)
+            Picasso.get()
+                .load(uri)
+                .fit()
+                .centerCrop()
+                .placeholder(R.drawable.placeholder_image)
+                .error(R.drawable.placeholder_image)
+                .into(holder.imageView)
             holder.itemView.setOnClickListener { onImageClick(uri) }
         }
         

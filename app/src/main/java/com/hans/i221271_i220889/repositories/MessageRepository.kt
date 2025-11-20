@@ -13,6 +13,8 @@ import okhttp3.RequestBody.Companion.asRequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
 import java.io.File
 import java.io.FileOutputStream
+import android.provider.OpenableColumns
+import android.database.Cursor
 
 class MessageRepository(private val context: Context) {
     
@@ -36,14 +38,27 @@ class MessageRepository(private val context: Context) {
                 isVanish = (if (isVanish) "1" else "0").toRequestBody("text/plain".toMediaTypeOrNull())
             )
             
-            if (response.isSuccessful && response.body()?.isSuccess() == true) {
-                response.body()?.data?.let {
-                    Result.success(it)
-                } ?: Result.failure(Exception("No data returned"))
+            if (response.isSuccessful) {
+                val body = response.body()
+                if (body?.isSuccess() == true) {
+                    body.data?.let {
+                        Result.success(it)
+                    } ?: Result.failure(Exception("No data returned"))
+                } else {
+                    val errorMsg = body?.message ?: response.errorBody()?.string() ?: "Failed to send message"
+                    Result.failure(Exception(errorMsg))
+                }
             } else {
-                Result.failure(Exception(response.body()?.message ?: "Failed to send message"))
+                val errorBody = response.errorBody()?.string() ?: "HTTP ${response.code()}"
+                Result.failure(Exception("Failed to send message: $errorBody"))
             }
+        } catch (e: com.google.gson.JsonSyntaxException) {
+            // Handle JSON parsing errors
+            val errorMsg = "Invalid response format: ${e.message}"
+            android.util.Log.e("MessageRepository", errorMsg, e)
+            Result.failure(Exception(errorMsg))
         } catch (e: Exception) {
+            android.util.Log.e("MessageRepository", "Error sending text message: ${e.message}", e)
             Result.failure(e)
         }
     }
@@ -63,25 +78,35 @@ class MessageRepository(private val context: Context) {
             val inputStream = context.contentResolver.openInputStream(mediaUri)
                 ?: return@withContext Result.failure(Exception("Cannot open media"))
             
-            val extension = when (mediaType) {
-                "video" -> ".mp4"
-                "image" -> ".jpg"
-                else -> ".dat"
-            }
-            val tempFile = File.createTempFile("message_", extension, context.cacheDir)
+            // Get original filename if available
+            val originalFileName = getFileName(mediaUri) ?: "file"
+            val extension = originalFileName.substringAfterLast('.', "")
+            
+            val tempFile = File.createTempFile("message_", if (extension.isNotEmpty()) ".$extension" else ".dat", context.cacheDir)
+            
+            // Check file size (max 2MB)
             FileOutputStream(tempFile).use { output ->
                 inputStream.copyTo(output)
             }
             inputStream.close()
             
-            // Create multipart request
+            val fileSize = tempFile.length()
+            val maxSize = 2 * 1024 * 1024L // 2MB
+            if (fileSize > maxSize) {
+                tempFile.delete()
+                return@withContext Result.failure(Exception("File size exceeds 2MB limit"))
+            }
+            
+            // Determine MIME type
             val mimeType = when (mediaType) {
-                "video" -> "video/*"
-                "image" -> "image/*"
+                "video" -> "video/mp4"
+                "image" -> context.contentResolver.getType(mediaUri) ?: "image/*"
+                "file" -> context.contentResolver.getType(mediaUri) ?: "application/octet-stream"
                 else -> "application/octet-stream"
             }
+            
             val requestBody = tempFile.asRequestBody(mimeType.toMediaTypeOrNull())
-            val mediaPart = MultipartBody.Part.createFormData("media", tempFile.name, requestBody)
+            val mediaPart = MultipartBody.Part.createFormData("media", originalFileName, requestBody)
             
             val response = ApiClient.apiService.sendMessage(
                 token = sessionManager.getAuthHeader(),
@@ -95,14 +120,27 @@ class MessageRepository(private val context: Context) {
             // Clean up temp file
             tempFile.delete()
             
-            if (response.isSuccessful && response.body()?.isSuccess() == true) {
-                response.body()?.data?.let {
-                    Result.success(it)
-                } ?: Result.failure(Exception("No data returned"))
+            if (response.isSuccessful) {
+                val body = response.body()
+                if (body?.isSuccess() == true) {
+                    body.data?.let {
+                        Result.success(it)
+                    } ?: Result.failure(Exception("No data returned"))
+                } else {
+                    val errorMsg = body?.message ?: response.errorBody()?.string() ?: "Failed to send message"
+                    Result.failure(Exception(errorMsg))
+                }
             } else {
-                Result.failure(Exception(response.body()?.message ?: "Failed to send message"))
+                val errorBody = response.errorBody()?.string() ?: "HTTP ${response.code()}"
+                Result.failure(Exception("Failed to send message: $errorBody"))
             }
+        } catch (e: com.google.gson.JsonSyntaxException) {
+            // Handle JSON parsing errors
+            val errorMsg = "Invalid response format: ${e.message}"
+            android.util.Log.e("MessageRepository", errorMsg, e)
+            Result.failure(Exception(errorMsg))
         } catch (e: Exception) {
+            android.util.Log.e("MessageRepository", "Error sending media: ${e.message}", e)
             Result.failure(e)
         }
     }
@@ -196,6 +234,32 @@ class MessageRepository(private val context: Context) {
         } catch (e: Exception) {
             Result.failure(e)
         }
+    }
+    
+    /**
+     * Get filename from URI
+     */
+    private fun getFileName(uri: Uri): String? {
+        var result: String? = null
+        if (uri.scheme == "content") {
+            val cursor: Cursor? = context.contentResolver.query(uri, null, null, null, null)
+            cursor?.use {
+                if (it.moveToFirst()) {
+                    val nameIndex = it.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+                    if (nameIndex >= 0) {
+                        result = it.getString(nameIndex)
+                    }
+                }
+            }
+        }
+        if (result == null) {
+            result = uri.path
+            val cut = result?.lastIndexOf('/')
+            if (cut != -1) {
+                result = result?.substring(cut!! + 1)
+            }
+        }
+        return result
     }
 }
 

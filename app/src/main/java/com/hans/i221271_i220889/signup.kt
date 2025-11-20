@@ -17,11 +17,14 @@ import android.app.DatePickerDialog
 import com.hans.i221271_i220889.utils.Base64Image
 import com.google.android.material.textfield.TextInputEditText
 import java.util.Calendar
+import com.google.firebase.messaging.FirebaseMessaging
 import com.hans.i221271_i220889.network.ApiClient
 import com.hans.i221271_i220889.network.SessionManager
+import com.hans.i221271_i220889.repositories.FcmRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
 
 class signup : AppCompatActivity() {
@@ -129,11 +132,21 @@ class signup : AppCompatActivity() {
             createButton.isEnabled = false // Prevent double click
             CoroutineScope(Dispatchers.IO).launch {
                 try {
+                    // Convert selected avatar to base64 if present
+                    val avatarBase64 = selectedImageUri?.let { uri ->
+                        try {
+                            Base64Image.uriToBase64(this@signup, uri)
+                        } catch (e: Exception) {
+                            null
+                        }
+                    }
+
                     val request = com.hans.i221271_i220889.network.SignupRequest(
                         username = username,
                         email = email,
                         password = password,
-                        fullName = null
+                        fullName = null,
+                        avatarBase64 = avatarBase64
                     )
                     val response = ApiClient.apiService.signup(request)
                     
@@ -144,6 +157,17 @@ class signup : AppCompatActivity() {
                             if (authData != null) {
                                 // Save session
                                 sessionManager.saveSession(authData)
+                                
+                                // Get and send FCM token in background
+                                CoroutineScope(Dispatchers.IO).launch {
+                                    try {
+                                        val fcmToken = FirebaseMessaging.getInstance().token.await()
+                                        val fcmRepository = FcmRepository(this@signup)
+                                        fcmRepository.updateFcmToken(fcmToken)
+                                    } catch (e: Exception) {
+                                        android.util.Log.e("Signup", "Failed to update FCM token: ${e.message}")
+                                    }
+                                }
                                 
                                 Toast.makeText(this@signup, "Account created successfully!", Toast.LENGTH_SHORT).show()
                                 
@@ -297,11 +321,20 @@ class signup : AppCompatActivity() {
                 isEnabled = false
                 CoroutineScope(Dispatchers.IO).launch {
                     try {
+                        val avatarBase64 = selectedImageUri?.let { uri ->
+                            try {
+                                Base64Image.uriToBase64(this@signup, uri)
+                            } catch (e: Exception) {
+                                null
+                            }
+                        }
+
                         val request = com.hans.i221271_i220889.network.SignupRequest(
                             username = username,
                             email = email,
                             password = password,
-                            fullName = null
+                            fullName = null,
+                            avatarBase64 = avatarBase64
                         )
                         val response = ApiClient.apiService.signup(request)
                         

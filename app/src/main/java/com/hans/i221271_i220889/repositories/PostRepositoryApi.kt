@@ -84,15 +84,20 @@ class PostRepositoryApi(private val context: Context) {
                 limit = limit
             )
             
-            if (response.isSuccessful && response.body()?.isSuccess() == true) {
-                response.body()?.data?.let {
-                    Result.success(it)
-                } ?: Result.success(emptyList())
+            if (response.isSuccessful) {
+                val apiResponse = response.body()
+                if (apiResponse?.isSuccess() == true) {
+                    val posts = apiResponse.data?.posts ?: emptyList()
+                    Result.success(posts)
+                } else {
+                    Result.failure(Exception(apiResponse?.message ?: "Failed to load feed"))
+                }
             } else {
-                Result.failure(Exception(response.body()?.message ?: "Failed to load feed"))
+                val errorBody = response.errorBody()?.string() ?: "Unknown error"
+                Result.failure(Exception("HTTP ${response.code()}: $errorBody"))
             }
         } catch (e: Exception) {
-            Result.failure(e)
+            Result.failure(Exception("Error loading feed: ${e.message}"))
         }
     }
     
@@ -108,12 +113,17 @@ class PostRepositoryApi(private val context: Context) {
                 limit = limit
             )
             
-            if (response.isSuccessful && response.body()?.isSuccess() == true) {
-                response.body()?.data?.let {
-                    Result.success(it)
-                } ?: Result.success(emptyList())
+            if (response.isSuccessful) {
+                val apiResponse = response.body()
+                if (apiResponse?.isSuccess() == true) {
+                    val posts = apiResponse.data?.posts ?: emptyList()
+                    Result.success(posts)
+                } else {
+                    Result.failure(Exception(apiResponse?.message ?: "Failed to load user posts"))
+                }
             } else {
-                Result.failure(Exception(response.body()?.message ?: "Failed to load user posts"))
+                val errorBody = response.errorBody()?.string() ?: "Unknown error"
+                Result.failure(Exception("HTTP ${response.code()}: $errorBody"))
             }
         } catch (e: Exception) {
             Result.failure(e)
@@ -170,10 +180,13 @@ class PostRepositoryApi(private val context: Context) {
      */
     suspend fun addComment(postId: Int, commentText: String): Result<CommentData> = withContext(Dispatchers.IO) {
         try {
-            val response = ApiClient.apiService.addComment(
-                token = sessionManager.getAuthHeader(),
+            val request = com.hans.i221271_i220889.network.AddCommentRequest(
                 postId = postId,
                 commentText = commentText
+            )
+            val response = ApiClient.apiService.addComment(
+                token = sessionManager.getAuthHeader(),
+                body = request
             )
             
             if (response.isSuccessful && response.body()?.isSuccess() == true) {

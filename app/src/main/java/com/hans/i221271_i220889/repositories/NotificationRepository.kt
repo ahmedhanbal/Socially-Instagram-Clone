@@ -67,14 +67,17 @@ class NotificationRepository(private val context: Context) {
         relatedItemId: Int? = null
     ): Result<Boolean> = withContext(Dispatchers.IO) {
         try {
-            val response = ApiClient.apiService.pushNotificationEvent(
-                token = sessionManager.getAuthHeader(),
+            val request = com.hans.i221271_i220889.network.PushNotificationRequest(
                 userId = userId,
                 type = type,
                 title = title,
                 message = message,
                 relatedUserId = relatedUserId,
                 relatedItemId = relatedItemId
+            )
+            val response = ApiClient.apiService.pushNotificationEvent(
+                token = sessionManager.getAuthHeader(),
+                body = request
             )
             
             if (response.isSuccessful && response.body()?.isSuccess() == true) {

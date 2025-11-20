@@ -51,9 +51,15 @@ class NotificationAdapter(
         holder.titleText.text = notification.title
         holder.bodyText.text = notification.message.ifEmpty { notification.body }
         
-        // Set time
-        val timeFormat = SimpleDateFormat("MMM dd, HH:mm", Locale.getDefault())
-        holder.timeText.text = timeFormat.format(Date(notification.timestamp))
+        // Set time (backend uses "YYYY-MM-DD HH:MM:SS")
+        val displayFormat = SimpleDateFormat("MMM dd, HH:mm", Locale.getDefault())
+        val backendFormat = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
+        holder.timeText.text = try {
+            val parsed = backendFormat.parse(notification.timestamp)
+            if (parsed != null) displayFormat.format(parsed) else notification.timestamp
+        } catch (e: Exception) {
+            notification.timestamp
+        }
         
         // Set background color if unread
         if (!notification.isRead) {

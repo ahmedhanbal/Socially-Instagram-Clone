@@ -5,21 +5,21 @@ import com.google.gson.annotations.SerializedName
 /**
  * Generic API response wrapper matching PHP backend format
  */
+
 data class ApiResponse<T>(
     @SerializedName("status")
     val status: String,
     
     @SerializedName("message")
-    val message: String?,
+    val message: String,
     
     @SerializedName("data")
-    val data: T? = null,
+    val data: T?,
     
-    @SerializedName("errors")
-    val errors: Map<String, String>? = null
+    @SerializedName("timestamp")
+    val timestamp: Long
 ) {
     fun isSuccess(): Boolean = status == "success"
-    fun isError(): Boolean = status == "error"
 }
 
 // ==================== REQUEST BODIES ====================
@@ -34,7 +34,11 @@ data class SignupRequest(
     val password: String,
     
     @SerializedName("full_name")
-    val fullName: String? = null
+    val fullName: String? = null,
+    
+    // Optional base64-encoded avatar image for signup
+    @SerializedName("avatar_base64")
+    val avatarBase64: String? = null
 )
 
 data class LoginRequest(
@@ -91,13 +95,13 @@ data class MarkSeenRequest(
 )
 
 data class SendFollowRequest(
-    @SerializedName("following_id")
-    val followingId: Int
+    @SerializedName("target_user_id")
+    val targetUserId: Int
 )
 
 data class RespondFollowRequest(
-    @SerializedName("follow_id")
-    val followId: Int,
+    @SerializedName("follower_id")
+    val followerId: Int,
     
     @SerializedName("action")
     val action: String
@@ -136,6 +140,11 @@ data class PushNotificationRequest(
 data class UpdateStatusRequest(
     @SerializedName("is_online")
     val isOnline: Boolean
+)
+
+data class UpdateFcmTokenRequest(
+    @SerializedName("fcm_token")
+    val fcmToken: String
 )
 
 data class ReportScreenshotRequest(
@@ -258,17 +267,39 @@ data class PostData(
     @SerializedName("media_type")
     val mediaType: String?,
     
-    @SerializedName("likes_count")
-    val likesCount: Int,
+    @SerializedName("like_count")
+    val likesCount: Int = 0,
     
-    @SerializedName("comments_count")
-    val commentsCount: Int,
+    @SerializedName("liked_by_me")
+    val isLiked: Boolean = false,
     
-    @SerializedName("is_liked")
-    val isLiked: Boolean,
+    @SerializedName("comment_count")
+    val commentsCount: Int = 0,
     
     @SerializedName("created_at")
-    val createdAt: String
+    val createdAt: String = ""
+)
+
+data class FeedResponse(
+    @SerializedName("page")
+    val page: Int,
+
+    @SerializedName("offset")
+    val offset: Int,
+
+    @SerializedName("limit")
+    val limit: Int,
+
+    @SerializedName("posts")
+    val posts: List<PostData> = emptyList()
+)
+
+data class StoryListResponse(
+    @SerializedName("viewer_id")
+    val viewerId: Int,
+
+    @SerializedName("stories")
+    val stories: List<StoryData> = emptyList()
 )
 
 // Comment data

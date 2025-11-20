@@ -7,16 +7,23 @@ import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import android.content.Intent
 import android.widget.TextView
+import android.widget.Toast
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.hans.i221271_i220889.adapters.UserAdapter
 import com.hans.i221271_i220889.models.User
+import com.hans.i221271_i220889.network.SessionManager
+import com.hans.i221271_i220889.repositories.FollowRepository
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.launch
 
 class MessagesList : AppCompatActivity() {
     
     private lateinit var usersRecyclerView: RecyclerView
     private lateinit var userAdapter: UserAdapter
     private val users = mutableListOf<User>()
+    private lateinit var sessionManager: SessionManager
+    private lateinit var followRepository: FollowRepository
     
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -27,32 +34,14 @@ class MessagesList : AppCompatActivity() {
             v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom)
             insets
         }
+        // Initialize session and repositories
+        sessionManager = SessionManager(this)
+        followRepository = FollowRepository(this)
+
+        // Set header title to current username or default
         val usernameTextView = findViewById<TextView>(R.id.header_title)
-        
-        // Fetch username from Firebase
-        val currentUserId = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid
-        if (currentUserId != null) {
-            com.google.firebase.database.FirebaseDatabase.getInstance().reference
-                .child("users")
-                .child(currentUserId)
-                .child("username")
-                .get()
-                .addOnSuccessListener { snapshot ->
-                    val username = snapshot.getValue(String::class.java) ?: "User"
-                    usernameTextView.text = username
-                }
-                .addOnFailureListener {
-                    // Fallback to SharedPreferences or default
-                    val sharedPref = getSharedPreferences("MyAppPrefs", MODE_PRIVATE)
-                    val username = sharedPref.getString("USERNAME_KEY", "Guest")
-                    usernameTextView.text = username
-                }
-        } else {
-            // Fallback to SharedPreferences or default
-            val sharedPref = getSharedPreferences("MyAppPrefs", MODE_PRIVATE)
-            val username = sharedPref.getString("USERNAME_KEY", "Guest")
-            usernameTextView.text = username
-        }
+        val username = sessionManager.getUsername() ?: "Messages"
+        usernameTextView.text = username
 
         // Setup users list
         setupUsersRecyclerView()
@@ -64,7 +53,7 @@ class MessagesList : AppCompatActivity() {
         userAdapter = UserAdapter(users) { user ->
             // Handle user click - start chat
             val intentChat = Intent(this, Chat::class.java)
-            intentChat.putExtra("PersonName", user.username)
+            intentChat.putExtra("PersonName", user.username.ifEmpty { "User" })
             intentChat.putExtra("userId", user.userId)
             startActivity(intentChat)
         }
@@ -73,30 +62,43 @@ class MessagesList : AppCompatActivity() {
     }
     
     private fun loadUsers() {
-        // Load real users from Firebase
-        val currentUserId = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid
-        if (currentUserId == null) {
-            return
+        // Show list of users the current user is following (as message contacts)
+        lifecycleScope.launch {
+            val userId = sessionManager.getUserId()
+            if (userId == -1) {
+                Toast.makeText(this@MessagesList, "Not logged in", Toast.LENGTH_SHORT).show()
+                return@launch
+            }
+
+            val result = followRepository.getFollowing(userId)
+            result.onSuccess { followDataList ->
+                users.clear()
+                followDataList.forEach { followData ->
+                    users.add(
+                        User(
+                            userId = followData.followingId.toString(),
+                            username = followData.username,
+                            email = "",
+                            fullName = followData.fullName ?: "",
+                            bio = "",
+                            profilePicture = followData.profilePicture ?: "",
+                            profileImageUrl = "",
+                            profileImageBase64 = "",
+                            coverPhoto = "",
+                            isPrivate = false,
+                            isFollowing = true,
+                            isFollowedBy = false
+                        )
+                    )
+                }
+                userAdapter.notifyDataSetChanged()
+
+                if (users.isEmpty()) {
+                    Toast.makeText(this@MessagesList, "No users to message yet", Toast.LENGTH_SHORT).show()
+                }
+            }.onFailure { error ->
+                Toast.makeText(this@MessagesList, "Failed to load users: ${error.message}", Toast.LENGTH_SHORT).show()
+            }
         }
-        
-        com.google.firebase.database.FirebaseDatabase.getInstance().reference
-            .child("users")
-            .addListenerForSingleValueEvent(object : com.google.firebase.database.ValueEventListener {
-                override fun onDataChange(snapshot: com.google.firebase.database.DataSnapshot) {
-                    users.clear()
-                    for (userSnapshot in snapshot.children) {
-                        val user = userSnapshot.getValue(User::class.java)
-                        // Only show other users, not the current user
-                        if (user != null && user.userId != currentUserId) {
-                            users.add(user)
-                        }
-                    }
-                    userAdapter.notifyDataSetChanged()
-                }
-                
-                override fun onCancelled(error: com.google.firebase.database.DatabaseError) {
-                    android.widget.Toast.makeText(this@MessagesList, "Failed to load users", android.widget.Toast.LENGTH_SHORT).show()
-                }
-            })
     }
 }

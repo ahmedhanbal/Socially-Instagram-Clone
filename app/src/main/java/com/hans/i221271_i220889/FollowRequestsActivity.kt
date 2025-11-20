@@ -95,7 +95,7 @@ class FollowRequestsActivity : AppCompatActivity() {
     private fun handleFollowRequest(user: User, action: String) {
         lifecycleScope.launch {
             val accept = action == "accept"
-            // The user.userId contains the follow relationship ID from FollowData
+            // The user.userId contains the follower_id (user ID of the requester) from FollowData
             val result = followRepository.respondToFollowRequest(user.userId.toInt(), accept)
             result.onSuccess {
                 pendingRequests.remove(user)
@@ -121,10 +121,10 @@ class FollowRequestsActivity : AppCompatActivity() {
             result.onSuccess { followDataList ->
                 pendingRequests.clear()
                 // Convert FollowData to User model
-                // Note: FollowData.id is the follow relationship ID, follower_id is the requester
+                // Note: FollowData.followerId is the user ID of the requester (needed for responding)
                 followDataList.forEach { followData ->
                     pendingRequests.add(User(
-                        userId = followData.id.toString(), // Store follow ID for responding
+                        userId = followData.followerId.toString(), // Store follower_id for responding
                         username = followData.username,
                         fullName = followData.fullName ?: "",
                         profilePicture = followData.profilePicture ?: "",

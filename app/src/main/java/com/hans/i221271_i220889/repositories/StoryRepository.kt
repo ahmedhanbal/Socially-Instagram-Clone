@@ -2,6 +2,7 @@ package com.hans.i221271_i220889.repositories
 
 import android.content.Context
 import android.net.Uri
+import android.util.Log
 import com.hans.i221271_i220889.network.ApiClient
 import com.hans.i221271_i220889.network.SessionManager
 import com.hans.i221271_i220889.network.StoryData
@@ -74,15 +75,21 @@ class StoryRepository(private val context: Context) {
                 userId = null // Get all stories
             )
             
-            if (response.isSuccessful && response.body()?.isSuccess() == true) {
-                response.body()?.data?.let {
-                    Result.success(it)
-                } ?: Result.success(emptyList())
+            if (response.isSuccessful) {
+                val apiResponse = response.body()
+                if (apiResponse?.isSuccess() == true) {
+                    val stories = apiResponse.data?.stories ?: emptyList()
+                    Result.success(stories)
+                } else {
+                    Result.failure(Exception(apiResponse?.message ?: "Failed to load stories"))
+                }
             } else {
-                Result.failure(Exception(response.body()?.message ?: "Failed to load stories"))
+                val errorBody = response.errorBody()?.string() ?: "Unknown error"
+                Result.failure(Exception("HTTP ${response.code()}: $errorBody"))
             }
         } catch (e: Exception) {
-            Result.failure(e)
+            Log.e("StoryRepository", "Error loading stories", e)
+            Result.failure(Exception("Error loading stories: ${e.message}"))
         }
     }
     
@@ -96,15 +103,21 @@ class StoryRepository(private val context: Context) {
                 userId = userId
             )
             
-            if (response.isSuccessful && response.body()?.isSuccess() == true) {
-                response.body()?.data?.let {
-                    Result.success(it)
-                } ?: Result.success(emptyList())
+            if (response.isSuccessful) {
+                val apiResponse = response.body()
+                if (apiResponse?.isSuccess() == true) {
+                    val stories = apiResponse.data?.stories ?: emptyList()
+                    Result.success(stories)
+                } else {
+                    Result.failure(Exception(apiResponse?.message ?: "Failed to load user stories"))
+                }
             } else {
-                Result.failure(Exception(response.body()?.message ?: "Failed to load user stories"))
+                val errorBody = response.errorBody()?.string() ?: "Unknown error"
+                Result.failure(Exception("HTTP ${response.code()}: $errorBody"))
             }
         } catch (e: Exception) {
-            Result.failure(e)
+            Log.e("StoryRepository", "Error loading user stories", e)
+            Result.failure(Exception("Error loading user stories: ${e.message}"))
         }
     }
 }

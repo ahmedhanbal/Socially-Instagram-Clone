@@ -16,7 +16,7 @@ class FollowRepository(private val context: Context) {
      */
     suspend fun sendFollowRequest(followingId: Int): Result<FollowData> = withContext(Dispatchers.IO) {
         try {
-            val request = com.hans.i221271_i220889.network.SendFollowRequest(followingId = followingId)
+            val request = com.hans.i221271_i220889.network.SendFollowRequest(targetUserId = followingId)
             val response = ApiClient.apiService.sendFollowRequest(
                 token = sessionManager.getAuthHeader(),
                 body = request
@@ -36,11 +36,12 @@ class FollowRepository(private val context: Context) {
     
     /**
      * Respond to a follow request (accept or reject)
+     * @param followerId The user ID of the person who sent the follow request
      */
-    suspend fun respondToFollowRequest(followId: Int, accept: Boolean): Result<Boolean> = withContext(Dispatchers.IO) {
+    suspend fun respondToFollowRequest(followerId: Int, accept: Boolean): Result<Boolean> = withContext(Dispatchers.IO) {
         try {
             val request = com.hans.i221271_i220889.network.RespondFollowRequest(
-                followId = followId,
+                followerId = followerId,
                 action = if (accept) "accept" else "reject"
             )
             val response = ApiClient.apiService.respondFollowRequest(
@@ -147,6 +148,40 @@ class FollowRepository(private val context: Context) {
                 Result.success(true)
             } else {
                 Result.failure(Exception(response.body()?.message ?: "Failed to unfollow"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+    
+    /**
+     * Check if there's a pending request from current user to target user
+     * This checks all outgoing requests from current user
+     */
+    suspend fun hasPendingRequestTo(targetUserId: Int): Result<Boolean> = withContext(Dispatchers.IO) {
+        try {
+            val currentUserId = sessionManager.getUserId()
+            if (currentUserId == -1) {
+                return@withContext Result.failure(Exception("Not logged in"))
+            }
+            
+            // Get all outgoing requests from current user
+            // We need to check if there's a pending request to the target user
+            // Since list_relations doesn't support outgoing requests, we'll check by getting
+            // all requests sent TO the target user and see if current user is in that list
+            val response = ApiClient.apiService.listRelations(
+                token = sessionManager.getAuthHeader(),
+                userId = targetUserId,
+                type = "requests"
+            )
+            
+            if (response.isSuccessful && response.body()?.isSuccess() == true) {
+                val requests = response.body()?.data ?: emptyList()
+                // Check if current user has a pending request to target user
+                val hasPending = requests.any { it.followerId == currentUserId && it.status == "pending" }
+                Result.success(hasPending)
+            } else {
+                Result.failure(Exception(response.body()?.message ?: "Failed to check pending request"))
             }
         } catch (e: Exception) {
             Result.failure(e)

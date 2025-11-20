@@ -36,6 +36,12 @@ interface ApiService {
         @Body body: UpdateProfileRequest
     ): Response<ApiResponse<UserProfileData>>
     
+    @POST("routes/profile/update_fcm_token.php")
+    suspend fun updateFcmToken(
+        @Header("Authorization") token: String,
+        @Body body: UpdateFcmTokenRequest
+    ): Response<ApiResponse<Any>>
+    
     @Multipart
     @POST("routes/profile/update_profile.php")
     suspend fun uploadProfilePicture(
@@ -57,7 +63,7 @@ interface ApiService {
     suspend fun listStories(
         @Header("Authorization") token: String,
         @Query("user_id") userId: Int? = null
-    ): Response<ApiResponse<List<StoryData>>>
+    ): Response<ApiResponse<StoryListResponse>>
     
     // ==================== POSTS ====================
     @Multipart
@@ -74,7 +80,7 @@ interface ApiService {
         @Header("Authorization") token: String,
         @Query("page") page: Int = 1,
         @Query("limit") limit: Int = 20
-    ): Response<ApiResponse<List<PostData>>>
+    ): Response<ApiResponse<FeedResponse>>
     
     @GET("routes/posts/list_feed.php")
     suspend fun getUserPosts(
@@ -82,7 +88,7 @@ interface ApiService {
         @Query("user_id") userId: Int,
         @Query("page") page: Int = 1,
         @Query("limit") limit: Int = 20
-    ): Response<ApiResponse<List<PostData>>>
+    ): Response<ApiResponse<FeedResponse>>
     
     @POST("routes/posts/toggle_like.php")
     suspend fun toggleLike(
@@ -122,13 +128,13 @@ interface ApiService {
         @Query("limit") limit: Int = 50
     ): Response<ApiResponse<List<MessageData>>>
     
-    @PUT("routes/messages/edit_message.php")
+    @POST("routes/messages/edit_message.php")
     suspend fun editMessage(
         @Header("Authorization") token: String,
         @Body body: EditMessageRequest
     ): Response<ApiResponse<MessageData>>
     
-    @HTTP(method = "DELETE", path = "routes/messages/delete_message.php", hasBody = true)
+    @POST("routes/messages/delete_message.php")
     suspend fun deleteMessage(
         @Header("Authorization") token: String,
         @Body body: DeleteMessageRequest

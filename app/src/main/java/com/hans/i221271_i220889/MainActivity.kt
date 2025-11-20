@@ -5,10 +5,6 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.content.Intent
-import android.widget.LinearLayout
-import android.widget.TextView
-import android.view.Gravity
-import com.google.firebase.FirebaseApp
 import com.hans.i221271_i220889.network.SessionManager
 
 class MainActivity : Activity() {
@@ -16,11 +12,8 @@ class MainActivity : Activity() {
         super.onCreate(savedInstanceState)
 
         try {
-            // Initialize Firebase
-            FirebaseApp.initializeApp(this)
-
-            // Create a simple splash screen programmatically
-            createSimpleSplashScreen()
+            // Use XML-based splash screen layout
+            setContentView(R.layout.activity_main)
 
             // Splash screen with 5-second delay as per requirements - check login status
             Handler(Looper.getMainLooper()).postDelayed({
@@ -72,31 +65,5 @@ class MainActivity : Activity() {
             startActivity(intent)
             finish()
         }
-    }
-
-    private fun createSimpleSplashScreen() {
-        val layout = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            gravity = Gravity.CENTER
-            setBackgroundColor(android.graphics.Color.WHITE)
-        }
-
-        val logo = TextView(this).apply {
-            text = "Socially"
-            textSize = 48f
-            setTextColor(android.graphics.Color.parseColor("#8e3f42"))
-            gravity = Gravity.CENTER
-        }
-
-        val subtitle = TextView(this).apply {
-            text = "from SMD"
-            textSize = 20f
-            setTextColor(android.graphics.Color.GRAY)
-            gravity = Gravity.CENTER
-        }
-
-        layout.addView(logo)
-        layout.addView(subtitle)
-        setContentView(layout)
     }
 }

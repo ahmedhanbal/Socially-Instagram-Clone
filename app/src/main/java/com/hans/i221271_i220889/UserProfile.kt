@@ -20,6 +20,7 @@ import com.hans.i221271_i220889.repositories.PostRepositoryApi
 import com.hans.i221271_i220889.repositories.FollowRepository
 import com.hans.i221271_i220889.network.SessionManager
 import androidx.lifecycle.lifecycleScope
+import androidx.recyclerview.widget.LinearLayoutManager
 import kotlinx.coroutines.launch
 
 class UserProfile : AppCompatActivity() {
@@ -78,8 +79,8 @@ class UserProfile : AppCompatActivity() {
     
     private fun setupPostsRecyclerView() {
         postsRecyclerView = findViewById(R.id.postsRecyclerView)
-        // Use GridLayoutManager for grid view
-        postsRecyclerView.layoutManager = GridLayoutManager(this, 3)
+        // Use vertical list (like home feed) for user posts
+        postsRecyclerView.layoutManager = LinearLayoutManager(this)
         postAdapter = PostAdapter(posts, postRepository, sessionManager, lifecycleScope) { post ->
             // Handle post click - open comments
             val intentComments = Intent(this, CommentsActivity::class.java)
@@ -140,10 +141,10 @@ class UserProfile : AppCompatActivity() {
                 
                 lifecycleScope.launch {
                     if (isFollowing) {
-                        // Unfollow
                         val result = followRepository.unfollow(targetUserIdInt)
                         result.onSuccess {
                             isFollowing = false
+                            hasPendingRequest = false
                             updateFollowButton()
                             loadUserStats() // Refresh stats
                             Toast.makeText(this@UserProfile, "Unfollowed successfully", Toast.LENGTH_SHORT).show()
@@ -154,7 +155,9 @@ class UserProfile : AppCompatActivity() {
                         // Send follow request
                         val result = followRepository.sendFollowRequest(targetUserIdInt)
                         result.onSuccess {
-                            isFollowing = true
+                            // Don't set isFollowing = true, just set hasPendingRequest = true
+                            hasPendingRequest = true
+                            isFollowing = false
                             updateFollowButton()
                             loadUserStats() // Refresh stats
                             Toast.makeText(this@UserProfile, "Follow request sent", Toast.LENGTH_SHORT).show()
@@ -188,19 +191,44 @@ class UserProfile : AppCompatActivity() {
             val currentUserIdInt = currentUserId!!.toIntOrNull() ?: return
             
             lifecycleScope.launch {
-                // Check if current user is following the target user
-                val result = followRepository.getFollowing(currentUserIdInt)
-                result.onSuccess { followingList ->
+                // Check if current user is following the target user (accepted)
+                val followingResult = followRepository.getFollowing(currentUserIdInt)
+                followingResult.onSuccess { followingList ->
                     isFollowing = followingList.any { it.followingId == targetUserIdInt }
-                    updateFollowButton()
+                    
+                    // If not following, check if there's a pending request
+                    if (!isFollowing) {
+                        val pendingResult = followRepository.hasPendingRequestTo(targetUserIdInt)
+                        pendingResult.onSuccess { hasPending ->
+                            hasPendingRequest = hasPending
+                            updateFollowButton()
+                        }.onFailure {
+                            // If check fails, assume no pending request
+                            hasPendingRequest = false
+                            updateFollowButton()
+                        }
+                    } else {
+                        // If already following, no pending request
+                        hasPendingRequest = false
+                        updateFollowButton()
+                    }
+                }.onFailure {
+                    // If check fails, try to check pending request anyway
+                    val pendingResult = followRepository.hasPendingRequestTo(targetUserIdInt)
+                    pendingResult.onSuccess { hasPending ->
+                        hasPendingRequest = hasPending
+                        updateFollowButton()
+                    }.onFailure {
+                        hasPendingRequest = false
+                        updateFollowButton()
+                    }
                 }
             }
         }
     }
     
     private fun checkPendingRequest() {
-        // No longer needed - follow status is handled by checkFollowStatus
-        hasPendingRequest = false
+        // This is now handled in checkFollowStatus()
     }
     
     private fun updateFollowButton() {
@@ -259,19 +287,21 @@ class UserProfile : AppCompatActivity() {
             result.onSuccess { postDataList ->
                 posts.clear()
                 postDataList.forEach { postData ->
-                    posts.add(Post(
-                        postId = postData.id.toString(),
-                        userId = postData.userId.toString(),
-                        username = postData.username,
-                        userProfileImageBase64 = postData.profilePicture ?: "",
-                        caption = postData.caption ?: "",
-                        imageBase64 = postData.mediaUrl ?: "",
-                        videoBase64 = if (postData.mediaType == "video") postData.mediaUrl ?: "" else "",
-                        timestamp = System.currentTimeMillis(),
-                        likesCount = postData.likesCount,
-                        commentsCount = postData.commentsCount,
-                        isLikedByCurrentUser = postData.isLiked
-                    ))
+                    posts.add(
+                        Post(
+                            postId = postData.id.toString(),
+                            userId = postData.userId.toString(),
+                            username = postData.username,
+                            userProfileImage = postData.profilePicture ?: "",
+                            caption = postData.caption ?: "",
+                            imageUrl = postData.mediaUrl ?: "",
+                            videoBase64 = if (postData.mediaType == "video") postData.mediaUrl ?: "" else "",
+                            timestamp = System.currentTimeMillis(),
+                            likesCount = postData.likesCount,
+                            commentsCount = postData.commentsCount,
+                            isLikedByCurrentUser = postData.isLiked
+                        )
+                    )
                 }
                 postAdapter.notifyDataSetChanged()
                 

@@ -14,6 +14,7 @@ import com.hans.i221271_i220889.adapters.UserAdapter
 import com.hans.i221271_i220889.models.User
 import com.hans.i221271_i220889.network.SessionManager
 import com.hans.i221271_i220889.repositories.FollowRepository
+import com.hans.i221271_i220889.repositories.SearchRepository
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.launch
 
@@ -26,6 +27,7 @@ class SelectFollowingActivity : AppCompatActivity() {
     private lateinit var userAdapter: UserAdapter
     private lateinit var sessionManager: SessionManager
     private lateinit var followRepository: FollowRepository
+    private lateinit var searchRepository: SearchRepository
     private val followingUsers = mutableListOf<User>()
     
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -49,6 +51,7 @@ class SelectFollowingActivity : AppCompatActivity() {
         
         sessionManager = SessionManager(this)
         followRepository = FollowRepository(this)
+        searchRepository = SearchRepository(this)
         
         // Setup RecyclerView
         setupUsersRecyclerView()
@@ -91,7 +94,21 @@ class SelectFollowingActivity : AppCompatActivity() {
             val result = followRepository.getFollowing(userId)
             result.onSuccess { followDataList ->
                 followingUsers.clear()
+                
+                // Get user IDs to fetch status
+                val userIds = followDataList.map { it.followingId }
+                
+                // Fetch statuses for all users
+                val statusResult = if (userIds.isNotEmpty()) {
+                    searchRepository.getUsersStatus(userIds)
+                } else {
+                    Result.success(emptyList())
+                }
+                
+                val statusMap = statusResult.getOrNull()?.associateBy { it.userId } ?: emptyMap()
+                
                 followDataList.forEach { followData ->
+                    val userStatus = statusMap[followData.followingId]
                     followingUsers.add(User(
                         userId = followData.followingId.toString(),
                         username = followData.username,
@@ -100,7 +117,8 @@ class SelectFollowingActivity : AppCompatActivity() {
                         bio = "",
                         isPrivate = false, // FollowData doesn't include privacy info
                         isFollowing = true,
-                        isFollowedBy = false
+                        isFollowedBy = false,
+                        isOnline = userStatus?.isOnline ?: false
                     ))
                 }
                 userAdapter.notifyDataSetChanged()
@@ -111,6 +129,22 @@ class SelectFollowingActivity : AppCompatActivity() {
             }.onFailure { exception ->
                 Toast.makeText(this@SelectFollowingActivity, "Failed to load following: ${exception.message}", Toast.LENGTH_SHORT).show()
             }
+        }
+    }
+    
+    override fun onResume() {
+        super.onResume()
+        // Update status to online
+        lifecycleScope.launch {
+            searchRepository.updateOnlineStatus(true)
+        }
+    }
+    
+    override fun onPause() {
+        super.onPause()
+        // Update status to offline
+        lifecycleScope.launch {
+            searchRepository.updateOnlineStatus(false)
         }
     }
 }

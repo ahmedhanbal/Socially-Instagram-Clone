@@ -7,19 +7,24 @@
     android:layout_height="match_parent"
     xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <ScrollView
+    <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
+        android:id="@+id/swipeRefresh"
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:background="@color/white"
         app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintBottom_toTopOf="@id/navigation_bar">
 
-        <!-- Main container using ConstraintLayout -->
-        <androidx.constraintlayout.widget.ConstraintLayout
-            android:id="@+id/main"
+        <ScrollView
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            tools:context=".HomeScreen">
+            android:layout_height="match_parent"
+            android:background="@color/white">
+
+            <!-- Main container using ConstraintLayout -->
+            <androidx.constraintlayout.widget.ConstraintLayout
+                android:id="@+id/main"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                tools:context=".HomeScreen">
 
             <!-- Top bar with logo and buttons -->
             <androidx.constraintlayout.widget.ConstraintLayout
@@ -79,7 +84,7 @@
             <androidx.recyclerview.widget.RecyclerView
                 android:id="@+id/storiesRecyclerView"
                 android:layout_width="match_parent"
-                android:layout_height="120dp"
+                android:layout_height="130dp"
                 android:layout_marginTop="16dp"
                 android:layout_marginBottom="16dp"
                 android:background="#F5F5F5"
@@ -90,16 +95,17 @@
                 app:layout_constraintStart_toStartOf="parent"
                 app:layout_constraintEnd_toEndOf="parent" />
 
-            <!-- Posts RecyclerView -->
-            <androidx.recyclerview.widget.RecyclerView
-                android:id="@+id/postsRecyclerView"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                app:layout_constraintTop_toBottomOf="@id/storiesRecyclerView"
-                android:layout_marginTop="8dp" />
+                <!-- Posts RecyclerView -->
+                <androidx.recyclerview.widget.RecyclerView
+                    android:id="@+id/postsRecyclerView"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    app:layout_constraintTop_toBottomOf="@id/storiesRecyclerView"
+                    android:layout_marginTop="8dp" />
 
-        </androidx.constraintlayout.widget.ConstraintLayout>
-    </ScrollView>
+            </androidx.constraintlayout.widget.ConstraintLayout>
+        </ScrollView>
+    </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
 
     <!-- Bottom Navigation Bar -->
     <LinearLayout
