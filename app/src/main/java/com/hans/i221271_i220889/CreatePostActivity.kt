@@ -17,8 +17,12 @@ import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import android.view.LayoutInflater
 import android.view.View
-import com.hans.i221271_i220889.utils.PostRepository
-import com.google.firebase.auth.FirebaseAuth
+import com.hans.i221271_i220889.repositories.PostRepositoryApi
+import com.hans.i221271_i220889.network.SessionManager
+import com.hans.i221271_i220889.offline.NetworkHelper
+import com.hans.i221271_i220889.offline.OfflineHelper
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.launch
 
 /**
  * Instagram-style Create Post Activity
@@ -28,7 +32,8 @@ import com.google.firebase.auth.FirebaseAuth
  */
 class CreatePostActivity : AppCompatActivity() {
     
-    private lateinit var postRepository: PostRepository
+    private lateinit var postRepository: PostRepositoryApi
+    private lateinit var sessionManager: SessionManager
     private var selectedImageUri: Uri? = null
     private lateinit var previewImageView: ImageView
     private lateinit var galleryRecyclerView: RecyclerView
@@ -39,7 +44,8 @@ class CreatePostActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         
-        postRepository = PostRepository()
+        postRepository = PostRepositoryApi(this)
+        sessionManager = SessionManager(this)
         
         if (checkPermissions()) {
             createInstagramStyleUI()
@@ -259,6 +265,11 @@ class CreatePostActivity : AppCompatActivity() {
     private fun createPost() {
         val caption = captionInput.text.toString().trim()
         
+        if (!sessionManager.isLoggedIn()) {
+            Toast.makeText(this, "Please login first", Toast.LENGTH_SHORT).show()
+            return
+        }
+        
         if (selectedImageUri == null) {
             Toast.makeText(this, "Please select an image", Toast.LENGTH_SHORT).show()
             return
@@ -269,17 +280,58 @@ class CreatePostActivity : AppCompatActivity() {
             return
         }
         
-        Toast.makeText(this, "Creating post...", Toast.LENGTH_SHORT).show()
-            
-            postRepository.createPost(this, selectedImageUri!!, caption) { success, postId ->
-                runOnUiThread {
-                    if (success) {
-                    Toast.makeText(this, "Post created!", Toast.LENGTH_SHORT).show()
-                    setResult(RESULT_OK)
+        val progressDialog = android.app.ProgressDialog(this).apply {
+            setMessage("Creating post...")
+            setCancelable(false)
+            show()
+        }
+        
+        lifecycleScope.launch {
+            try {
+                if (NetworkHelper.isOnline(this@CreatePostActivity)) {
+                    // Online - create post directly
+                    val result = postRepository.createPost(
+                        caption = caption,
+                        mediaUri = selectedImageUri,
+                        mediaType = "image"
+                    )
+                    
+                    progressDialog.dismiss()
+                    
+                    result.onSuccess {
+                        Toast.makeText(this@CreatePostActivity, "Post created!", Toast.LENGTH_SHORT).show()
+                        setResult(RESULT_OK)
                         finish()
-                    } else {
-                        Toast.makeText(this, "Failed to create post", Toast.LENGTH_SHORT).show()
+                    }.onFailure { error ->
+                        Toast.makeText(this@CreatePostActivity, "Failed: ${error.message}", Toast.LENGTH_SHORT).show()
+                    }
+                } else {
+                    // Offline - queue for later
+                    progressDialog.dismiss()
+                    
+                    // Save to temp file for queue
+                    val tempFile = java.io.File.createTempFile("post_", ".jpg", cacheDir)
+                    contentResolver.openInputStream(selectedImageUri!!)?.use { input ->
+                        tempFile.outputStream().use { output ->
+                            input.copyTo(output)
+                        }
+                    }
+                    
+                    val queueManager = OfflineHelper.getQueueManager(this@CreatePostActivity)
+                    queueManager.queueCreatePost(caption, tempFile.absolutePath, "image")
+                    
+                    Toast.makeText(
+                        this@CreatePostActivity,
+                        "Offline: Post queued, will upload when online",
+                        Toast.LENGTH_LONG
+                    ).show()
+                    
+                    setResult(RESULT_OK)
+                    finish()
                 }
+            } catch (e: Exception) {
+                progressDialog.dismiss()
+                Toast.makeText(this@CreatePostActivity, "Error: ${e.message}", Toast.LENGTH_SHORT).show()
             }
         }
     }
