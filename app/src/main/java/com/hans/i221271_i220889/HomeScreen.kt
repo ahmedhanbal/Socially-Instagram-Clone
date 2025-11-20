@@ -30,7 +30,7 @@ class HomeScreen : AppCompatActivity() {
     private lateinit var postsRecyclerView: RecyclerView
     private lateinit var postAdapter: PostAdapter
     private val posts = mutableListOf<Post>()
-    
+
     // Stories RecyclerView properties
     private lateinit var storiesRecyclerView: RecyclerView
     private lateinit var storyAdapter: com.hans.i221271_i220889.adapters.StoryAdapter
@@ -103,6 +103,13 @@ class HomeScreen : AppCompatActivity() {
 
         // Load stories from API
         loadStoriesFromApi()
+        val uploadStory = findViewById<ImageButton>(R.id.uploadStoryButton)
+        uploadStory?.setOnClickListener {
+            val intent = Intent(this, storyUpload::class.java)
+            startActivity(intent)
+            finish()
+            overridePendingTransition(0, 0)
+        }
 
         // Set up the Search button to open the search screen
         val searchBtn = findViewById<ImageButton>(R.id.tab_2_search)

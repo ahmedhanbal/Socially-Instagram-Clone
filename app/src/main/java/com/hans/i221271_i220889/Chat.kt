@@ -85,7 +85,7 @@ class Chat : AppCompatActivity() {
         android.util.Log.d("Chat", "onCreate: Getting intent extras")
         val otherUserId = intent.getStringExtra("userId")
         val personName = intent.getStringExtra("PersonName")
-        val currentUserId = sessionManager.getSession()?.userId?.toString()
+        val currentUserId = sessionManager.getUserId().toString()
         
         android.util.Log.d("Chat", "onCreate: Intent data - otherUserId=$otherUserId, personName=$personName, currentUserId=$currentUserId")
         
@@ -310,7 +310,7 @@ class Chat : AppCompatActivity() {
             val result = messageRepository.getMessages(receiverId)
             result.onSuccess { messageDataList ->
                 messages.clear()
-                val currentUserId = sessionManager.getSession()?.userId?.toString() ?: ""
+                val currentUserId = sessionManager.getUserId().toString()
                 messageDataList.forEach { msgData ->
                     messages.add(ChatMessage(
                         messageId = msgData.id.toString(),

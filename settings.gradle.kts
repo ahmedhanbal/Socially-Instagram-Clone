@@ -21,4 +21,3 @@ dependencyResolutionManagement {
 
 rootProject.name = "Socially"
 include(":app")
-s

@@ -44,7 +44,7 @@ class PostAdapter(
 
     override fun onBindViewHolder(holder: PostViewHolder, position: Int) {
         val post = posts[position]
-        val currentUserId = sessionManager.getSession()?.userId?.toString()
+        val currentUserId = sessionManager.getUserId().toString()
 
         // Set profile image (Base64 encoded)
         if (post.userProfileImage.isNotEmpty()) {
@@ -91,7 +91,7 @@ class PostAdapter(
         // Profile image click - navigate to user profile
         holder.profileImage.setOnClickListener {
             val context = holder.itemView.context
-            val currentUserId = sessionManager.getSession()?.userId?.toString()
+            val currentUserId = sessionManager.getUserId().toString()
             // If clicking own profile, go to OwnProfile, else UserProfile
             if (post.userId == currentUserId) {
                 val intent = Intent(context, com.hans.i221271_i220889.OwnProfile::class.java)
@@ -106,7 +106,7 @@ class PostAdapter(
         // Username click - navigate to user profile
         holder.username.setOnClickListener {
             val context = holder.itemView.context
-            val currentUserId = sessionManager.getSession()?.userId?.toString()
+            val currentUserId = sessionManager.getUserId().toString()
             // If clicking own profile, go to OwnProfile, else UserProfile
             if (post.userId == currentUserId) {
                 val intent = Intent(context, com.hans.i221271_i220889.OwnProfile::class.java)

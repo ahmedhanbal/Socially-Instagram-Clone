@@ -53,7 +53,7 @@ class UserProfile : AppCompatActivity() {
         
         // Get user IDs
         targetUserId = intent.getStringExtra("userId")
-        currentUserId = sessionManager.getSession()?.userId?.toString()
+        currentUserId = sessionManager.getUserId().toString()
         
         // If viewing own profile, redirect to OwnProfile
         if (targetUserId == null || targetUserId == currentUserId) {
