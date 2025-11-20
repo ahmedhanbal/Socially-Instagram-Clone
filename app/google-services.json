@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "911367191817",
+    "project_id": "socially-assign",
+    "storage_bucket": "socially-assign.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:911367191817:android:b5cdccd0e53904051127d8",
+        "android_client_info": {
+          "package_name": "com.hans.i221271_i220889"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD23z5p6R4WcEQVpdn04QRfrX2M_v8TnqM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

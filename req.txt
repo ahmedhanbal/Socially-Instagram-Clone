@@ -1,0 +1,85 @@
+1. GitHub Version Control (10 Marks)
+● Create a new repository for this assignment and push your code to
+GitHub
+● Each implemented feature must have a corresponding commit with a
+meaningful message
+● Note: Commits from both group members are mandatory. The
+repository history must clearly reflect contributions from both
+members
+2. Splash Screen (5 Marks)
+● A splash screen should be implemented, automatically navigating to
+the next screen after 5 seconds
+3. User Authentication (5 Marks)
+● Implement signup, login, and logout by consuming your own web
+service endpoints
+● Store user sessions securely on the device
+● First-time users should be directed to the Profile Setup screen
+● Logged-in users should be taken directly from the splash screen to
+the home screen
+
+4. Stories Feature (10 Marks)
+● Users can upload temporary images/videos that disappear after 24
+hours
+● Display stories at the top of the home screen in a horizontal scroll
+view
+● Consume web service endpoints to upload and fetch stories, storing
+metadata in MySQL/MariaDB
+5. Photo & Media Uploads (5 Marks)
+● Users can upload images in posts via web service
+● Posts should support likes and comments, managed by server
+endpoints
+6. Messaging System (15 Marks)
+● Vanish Mode: Messages disappear once seen and the chat is closed
+● Media Sharing: Users can send text, images, videos, and files via
+web services
+● Message Editing & Deletion: Users can edit or delete messages
+within 5 minutes
+● Messages should be stored on the server in MySQL/MariaDB and
+cached locally in SQLite for offline viewing
+7. Voice & Video Calls (10 Marks)
+● Implement real-time audio and video calls using the Agora API
+● Calls should work seamlessly within the chat system
+8. Follow System & User Interactions (5 Marks)
+● Users can send and accept/reject follow requests via web services
+● Users can view who they follow and who follows them
+● Profile pictures and cover photos can be updated via server
+endpoints
+
+9. Push Notifications (10 Marks)
+● Implement push notifications using Firebase Cloud Messaging (FCM)
+● Notify users about new messages, follow requests, and chat
+screenshot alerts
+10. Search & Filters (5 Marks)
+● Implement search functionality to find users by username via web
+services
+● Users should be able to filter by followers/following
+11. Online/Offline Status (5 Marks)
+● Display whether users are online or offline in real-time
+12. Security & Privacy Features (5 Marks)
+● Users will receive a notification if someone takes a screenshot of their
+chat
+● Implement data caching using Picasso to ensure images are
+accessible even offline
+13. Offline Support (10 Marks)
+● Use SQLite to store messages, posts, and stories locally
+● Queue all user actions (e.g., messages sent offline) in SQLite when
+the device is offline
+● Implement a background sync mechanism that automatically retries
+and completes these queued requests as soon as the device
+reconnects to the internet, ensuring no data loss or duplication
+
+Backend & Database Details
+Web Services
+● Implement RESTful APIs in the language of your choice (preferably
+PHP)
+Database
+● Use MySQL or MariaDB on the server to store users, messages,
+posts, follows, and stories
+Offline Cache
+● Use SQLite on the device for local storage and queuing offline
+requests
+Media Storage
+● Store uploaded media on the server filesystem accessible via your
+APIs
+Notifications
+● Use FCM for push notifications

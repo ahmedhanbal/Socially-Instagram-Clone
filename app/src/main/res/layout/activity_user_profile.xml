@@ -1,0 +1,310 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    xmlns:android="http://schemas.android.com/apk/res/android">
+    <ScrollView xmlns:app="http://schemas.android.com/apk/res-auto"
+        xmlns:tools="http://schemas.android.com/tools"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@color/white"
+        android:layout_marginBottom="70dp"
+        xmlns:android="http://schemas.android.com/apk/res/android">
+        <androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+            xmlns:app="http://schemas.android.com/apk/res-auto"
+            xmlns:tools="http://schemas.android.com/tools"
+            android:id="@+id/main"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="@color/white"
+            tools:context=".UserProfile">
+
+            <!-- Story (ring + profile pic) -->
+            <FrameLayout
+                android:id="@+id/UserStoryViewMain"
+                android:layout_width="104dp"
+                android:layout_height="104dp"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toTopOf="parent"
+                android:layout_marginHorizontal="10dp"
+                android:layout_marginTop="64dp">
+
+                <!-- Story ring -->
+                <ImageView
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:src="@drawable/circlestory"
+                    android:scaleType="fitXY" />
+
+                <!-- Profile picture -->
+                <ImageView
+                    android:id="@+id/UserStoryView"
+                    android:layout_width="96dp"
+                    android:layout_height="96dp"
+                    android:layout_gravity="center"
+                    android:src="@drawable/ic_default_profile"
+                    android:scaleType="centerCrop"
+                    android:background="@drawable/circlestory"
+                    android:clipToOutline="true"
+                    android:clickable="true"
+                    android:focusable="true"/>
+            </FrameLayout>
+
+            <TextView
+                android:id="@+id/header_title"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toTopOf="parent"
+                android:text=""
+                android:textSize="28sp"
+                android:textStyle="bold"
+                android:layout_centerInParent="true"
+                android:gravity="center"
+                android:layout_margin="16dp"/>
+
+            <TextView
+                android:id="@+id/Posts"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                app:layout_constraintStart_toEndOf="@id/UserStoryViewMain"
+                app:layout_constraintTop_toTopOf="@id/UserStoryViewMain"
+                app:layout_constraintBottom_toBottomOf="@id/UserStoryViewMain"
+                android:text="0\nposts"
+                android:textSize="20sp"
+                android:textStyle="bold"
+                android:layout_centerInParent="true"
+                android:gravity="center"
+                android:layout_margin="16dp"
+                android:clickable="true"
+                android:focusable="true"/>
+
+            <TextView
+                android:id="@+id/Followers"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                app:layout_constraintStart_toEndOf="@id/Posts"
+                app:layout_constraintTop_toTopOf="@id/UserStoryViewMain"
+                app:layout_constraintBottom_toBottomOf="@id/UserStoryViewMain"
+                android:text="0\nfollowers"
+                android:textSize="20sp"
+                android:textStyle="bold"
+                android:layout_centerInParent="true"
+                android:gravity="center"
+                android:layout_margin="16dp"
+                android:clickable="true"
+                android:focusable="true"/>
+
+            <TextView
+                android:id="@+id/Following"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                app:layout_constraintStart_toEndOf="@id/Followers"
+                app:layout_constraintTop_toTopOf="@id/UserStoryViewMain"
+                app:layout_constraintBottom_toBottomOf="@id/UserStoryViewMain"
+                android:text="0\nfollowing"
+                android:textSize="20sp"
+                android:textStyle="bold"
+                android:layout_centerInParent="true"
+                android:gravity="center"
+                android:layout_margin="16dp"
+                android:clickable="true"
+                android:focusable="true"/>
+
+            <TextView
+                android:id="@+id/header_title_2"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                app:layout_constraintStart_toStartOf="@id/UserStoryViewMain"
+                app:layout_constraintEnd_toEndOf="@id/UserStoryViewMain"
+                app:layout_constraintTop_toBottomOf="@id/UserStoryViewMain"
+                android:text=""
+                android:textSize="22sp"
+                android:textStyle="bold"
+                android:layout_centerInParent="true"
+                android:gravity="center"
+                android:layout_margin="16dp"/>
+
+            <TextView
+                android:id="@+id/header_title_3"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                app:layout_constraintStart_toStartOf="@id/UserStoryViewMain"
+                app:layout_constraintEnd_toEndOf="@id/UserStoryViewMain"
+                app:layout_constraintTop_toBottomOf="@id/header_title_2"
+                android:text=""
+                android:textSize="18sp"
+                android:layout_centerInParent="true"
+                android:gravity="center"
+                android:background="@drawable/rounded_button_more"
+                android:backgroundTint="@color/grey"
+                android:layout_margin="16dp"
+                android:paddingHorizontal="12dp"/>
+
+            <TextView
+                android:id="@+id/header_title_4"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                app:layout_constraintStart_toStartOf="@id/UserStoryViewMain"
+                app:layout_constraintTop_toBottomOf="@id/header_title_3"
+                android:text=""
+                android:textSize="18sp"
+                android:textColor="@color/dark_grey"
+                android:layout_centerInParent="true"
+                android:gravity="center"
+                android:layout_marginTop="16dp"
+                android:paddingHorizontal="12dp"/>
+
+            <TextView
+                android:id="@+id/paragraphText"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                app:layout_constraintStart_toStartOf="@id/UserStoryViewMain"
+                app:layout_constraintEnd_toEndOf="@id/UserStoryViewMain"
+                app:layout_constraintTop_toBottomOf="@id/header_title_4"
+                android:padding="16dp"
+                android:layout_marginHorizontal="18dp"
+                android:lineSpacingExtra="4dp"
+                android:textSize="16sp"
+                android:textColor="@android:color/black"
+                android:justificationMode="none"
+                android:ellipsize="none"
+                android:scrollHorizontally="false"
+                android:scrollbars="vertical"
+                android:text="" />
+
+            <TextView
+                android:id="@+id/header_title_5"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                app:layout_constraintStart_toStartOf="@id/UserStoryViewMain"
+                app:layout_constraintTop_toBottomOf="@id/paragraphText"
+                android:text=""
+                android:textSize="18sp"
+                android:layout_centerInParent="true"
+                android:gravity="center"
+                android:layout_margin="12dp"
+                android:paddingHorizontal="12dp"/>
+
+
+            <TextView
+                android:id="@+id/FollowingBadge"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toBottomOf="@id/header_title_5"
+                android:text="Follow"
+                android:textSize="18sp"
+                android:layout_centerInParent="true"
+                android:gravity="center"
+                android:background="@drawable/rounded_button"
+                android:backgroundTint="@color/grey"
+                android:layout_margin="16dp"
+                android:padding="10dp"/>
+
+            <TextView
+                android:id="@+id/MessageBadge"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                app:layout_constraintStart_toEndOf="@id/FollowingBadge"
+                app:layout_constraintTop_toBottomOf="@id/header_title_5"
+                android:text="Message"
+                android:textSize="18sp"
+                android:layout_centerInParent="true"
+                android:gravity="center"
+                android:background="@drawable/rounded_button"
+                android:backgroundTint="@color/grey"
+                android:layout_margin="16dp"
+                android:padding="10dp"/>
+
+            <TextView
+                android:id="@+id/EmailBadge"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                app:layout_constraintStart_toEndOf="@id/MessageBadge"
+                app:layout_constraintTop_toBottomOf="@id/header_title_5"
+                android:text="Email"
+                android:textSize="18sp"
+                android:layout_centerInParent="true"
+                android:gravity="center"
+                android:background="@drawable/rounded_button"
+                android:backgroundTint="@color/grey"
+                android:layout_margin="16dp"
+                android:padding="10dp"/>
+
+            <!-- Posts RecyclerView -->
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/postsRecyclerView"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                app:layout_constraintTop_toBottomOf="@id/EmailBadge"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintEnd_toEndOf="parent"
+                android:layout_marginTop="16dp"
+                android:padding="8dp" />
+        </androidx.constraintlayout.widget.ConstraintLayout>
+    </ScrollView>
+    <!-- Bottom Navigation Bar, Always fixed at the bottom -->
+    <!-- Bottom Navigation Bar, Always fixed at the bottom -->
+    <LinearLayout
+        android:id="@+id/navigation_bar"
+        android:layout_width="match_parent"
+        android:layout_height="70dp"
+        android:src="@drawable/feed"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintRight_toRightOf="parent"
+        app:layout_constraintLeft_toLeftOf="parent"
+        android:weightSum="50"
+        android:orientation="horizontal"
+        android:scaleType="centerCrop"
+        android:background="@color/white">
+        <ImageButton
+            android:id="@+id/tab_1"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="10"
+            android:src="@drawable/tab_1"
+            android:background="@color/white"/>
+        <ImageButton
+            android:id="@+id/tab_2_search"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="10"
+            android:src="@drawable/tab_2_search"
+            android:background="@color/white"/>
+        <ImageButton
+            android:id="@+id/tab_3_plus"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="10"
+            android:src="@drawable/tab_3_plus"
+            android:background="@color/white"/>
+        <ImageButton
+            android:id="@+id/tab_4_notification"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="10"
+            android:src="@drawable/tab_4_notification"
+            android:background="@color/white"/>
+        <FrameLayout
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="10"
+            android:gravity="center">
+
+            <ImageButton
+                android:id="@+id/tab_5"
+                android:layout_width="35dp"
+                android:layout_height="35dp"
+                android:background="@drawable/circle_profile_right_bottom"
+                android:scaleType="centerCrop"
+                android:clipToOutline="true"
+                android:layout_gravity="center"/>
+        </FrameLayout>
+    </LinearLayout>
+
+
+</androidx.constraintlayout.widget.ConstraintLayout>

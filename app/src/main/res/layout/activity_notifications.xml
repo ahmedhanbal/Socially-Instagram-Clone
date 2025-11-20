@@ -1,0 +1,136 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/main"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@color/white">
+
+
+    <!-- Search Bar Section -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:padding="10dp"
+        android:layout_margin="15dp"
+        android:backgroundTint="@color/grey">
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Following"
+            android:textColor="@color/brown"
+            android:textSize="30sp"
+            android:textStyle="bold"
+            android:layout_marginStart="8dp"
+            android:gravity="center"/>
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="You"
+            android:textColor="@color/brown"
+            android:textSize="30sp"
+            android:layout_marginStart="8dp"
+            android:gravity="center"/>
+
+    </LinearLayout>
+
+    <!-- Messages Section -->
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1">
+
+        <LinearLayout
+            android:orientation="vertical"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:padding="8dp">
+
+            <!-- Follow Requests Button -->
+            <android.widget.Button
+                android:id="@+id/followRequestsButton"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="View Follow Requests"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                android:backgroundTint="@color/brown"
+                android:textColor="@color/white"
+                android:padding="16dp"
+                android:layout_margin="8dp"/>
+
+            <!-- Notifications RecyclerView (for future implementation) -->
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/notificationsRecyclerView"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:padding="8dp"/>
+
+        </LinearLayout>
+    </ScrollView>
+
+    <!-- Bottom Navigation Bar, Always fixed at the bottom -->
+    <LinearLayout
+        android:id="@+id/navigation_bar"
+        android:layout_width="match_parent"
+        android:layout_height="70dp"
+        android:src="@drawable/feed"
+        android:weightSum="50"
+        android:orientation="horizontal"
+        android:scaleType="centerCrop"
+        android:background="@color/white">
+        <ImageButton
+            android:id="@+id/tab_1"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="10"
+            android:src="@drawable/tab_1"
+            android:background="@color/white"/>
+        <ImageButton
+            android:id="@+id/tab_2_search"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="10"
+            android:src="@drawable/tab_2_search"
+            android:background="@color/white"/>
+        <ImageButton
+            android:id="@+id/tab_3_plus"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="10"
+            android:src="@drawable/tab_3_plus"
+            android:background="@color/white"/>
+        <ImageButton
+            android:id="@+id/tab_4_notification_filled"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="10"
+            android:src="@drawable/tab_4_notification_filled"
+            android:background="@color/white"/>
+        <FrameLayout
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="10"
+            android:gravity="center">
+
+            <ImageButton
+                android:id="@+id/tab_5"
+                android:layout_width="35dp"
+                android:layout_height="35dp"
+                android:background="@drawable/circle_profile_right_bottom"
+                android:scaleType="centerCrop"
+                android:clipToOutline="true"
+                android:layout_gravity="center"/>
+        </FrameLayout>
+
+
+
+
+    </LinearLayout>
+
+</LinearLayout>
