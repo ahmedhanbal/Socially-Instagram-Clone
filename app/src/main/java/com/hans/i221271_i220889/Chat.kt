@@ -17,22 +17,22 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.hans.i221271_i220889.adapters.MessageAdapter
 import com.hans.i221271_i220889.utils.ChatMessage
-import com.hans.i221271_i220889.utils.ChatRepository
-import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.database.*
+import com.hans.i221271_i220889.repositories.MessageRepository
+import com.hans.i221271_i220889.network.SessionManager
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
 
 /**
  * Instagram-style Chat Activity
  * Features:
  * - Send text messages
- * - Send images
- * - Share posts
- * - Edit messages (within 5 minutes)
- * - Delete messages (within 5 minutes)
- * - Real-time message updates
+ * - Send images (Base64)
+ * - Real-time message updates (polling-based)
  */
 class Chat : AppCompatActivity() {
-    private val chatRepository = ChatRepository()
+    private lateinit var messageRepository: MessageRepository
+    private lateinit var sessionManager: SessionManager
     private lateinit var chatId: String
     private lateinit var messagesRecyclerView: RecyclerView
     private lateinit var messageAdapter: MessageAdapter
@@ -41,6 +41,7 @@ class Chat : AppCompatActivity() {
     private lateinit var sendButton: ImageButton
     private val PERMISSION_REQUEST_CODE = 102
     private var otherUserIdForProfile: String? = null
+    private var isLoadingMessages = false
     
     // Image picker
     private val imagePickerLauncher = registerForActivityResult(
@@ -76,11 +77,15 @@ class Chat : AppCompatActivity() {
             e.printStackTrace()
         }
 
+        // Initialize repositories
+        sessionManager = SessionManager(this)
+        messageRepository = MessageRepository(this)
+        
         // Get chat ID from intent or generate one
         android.util.Log.d("Chat", "onCreate: Getting intent extras")
         val otherUserId = intent.getStringExtra("userId")
         val personName = intent.getStringExtra("PersonName")
-        val currentUserId = FirebaseAuth.getInstance().currentUser?.uid
+        val currentUserId = sessionManager.getSession()?.userId?.toString()
         
         android.util.Log.d("Chat", "onCreate: Intent data - otherUserId=$otherUserId, personName=$personName, currentUserId=$currentUserId")
         
@@ -280,48 +285,103 @@ class Chat : AppCompatActivity() {
     }
 
     private fun loadMessagesRealTime() {
-        val messagesRef = FirebaseDatabase.getInstance().reference
-            .child("messages")
-            .child(chatId)
+        // Simulate real-time updates with periodic polling
+        lifecycleScope.launch {
+            while (true) {
+                if (!isLoadingMessages) {
+                    loadMessages()
+                }
+                delay(3000) // Poll every 3 seconds
+            }
+        }
+    }
+    
+    private fun loadMessages() {
+        if (isLoadingMessages) return
+        isLoadingMessages = true
         
-        messagesRef.orderByChild("timestamp").addValueEventListener(object : ValueEventListener {
-            override fun onDataChange(snapshot: DataSnapshot) {
+        val receiverId = otherUserIdForProfile?.toIntOrNull()
+        if (receiverId == null) {
+            isLoadingMessages = false
+            return
+        }
+        
+        lifecycleScope.launch {
+            val result = messageRepository.getMessages(receiverId)
+            result.onSuccess { messageDataList ->
                 messages.clear()
-                for (messageSnapshot in snapshot.children) {
-                    val message = messageSnapshot.getValue(ChatMessage::class.java)
-                    message?.let { messages.add(it) }
+                val currentUserId = sessionManager.getSession()?.userId?.toString() ?: ""
+                messageDataList.forEach { msgData ->
+                    messages.add(ChatMessage(
+                        messageId = msgData.id.toString(),
+                        senderId = msgData.senderId.toString(),
+                        receiverId = msgData.receiverId.toString(),
+                        message = msgData.content,
+                        imageBase64 = msgData.mediaUrl ?: "",
+                        postId = null,
+                        timestamp = System.currentTimeMillis(),
+                        isEdited = false,
+                        isDeleted = false,
+                        isSentByCurrentUser = msgData.senderId.toString() == currentUserId
+                    ))
                 }
                 messageAdapter.notifyDataSetChanged()
                 if (messages.isNotEmpty()) {
                     messagesRecyclerView.scrollToPosition(messages.size - 1)
                 }
+            }.onFailure { error ->
+                android.util.Log.e("Chat", "Failed to load messages: ${error.message}")
             }
-            
-            override fun onCancelled(error: DatabaseError) {
-                Toast.makeText(this@Chat, "Failed to load messages", Toast.LENGTH_SHORT).show()
-            }
-        })
+            isLoadingMessages = false
+        }
     }
 
     private fun sendTextMessage(text: String) {
-        chatRepository.sendText(chatId, text) { success ->
-            runOnUiThread {
-                if (!success) {
-                    Toast.makeText(this, "Failed to send message", Toast.LENGTH_SHORT).show()
-                }
+        val receiverId = otherUserIdForProfile?.toIntOrNull()
+        if (receiverId == null) {
+            Toast.makeText(this, "Invalid receiver ID", Toast.LENGTH_SHORT).show()
+            return
+        }
+        
+        lifecycleScope.launch {
+            val result = messageRepository.sendMessage(receiverId, text)
+            result.onSuccess {
+                messageInput.text.clear()
+                loadMessages() // Refresh messages
+            }.onFailure { error ->
+                Toast.makeText(this@Chat, "Failed to send message: ${error.message}", Toast.LENGTH_SHORT).show()
             }
         }
     }
 
     private fun sendImage(imageUri: Uri) {
         Toast.makeText(this, "Sending image...", Toast.LENGTH_SHORT).show()
-        chatRepository.sendImage(this, chatId, imageUri) { success ->
-            runOnUiThread {
-                if (success) {
-                    Toast.makeText(this, "Image sent", Toast.LENGTH_SHORT).show()
+        val receiverId = otherUserIdForProfile?.toIntOrNull()
+        if (receiverId == null) {
+            Toast.makeText(this, "Invalid receiver ID", Toast.LENGTH_SHORT).show()
+            return
+        }
+        
+        lifecycleScope.launch {
+            try {
+                val inputStream = contentResolver.openInputStream(imageUri)
+                val bytes = inputStream?.readBytes()
+                inputStream?.close()
+                
+                if (bytes != null) {
+                    val base64Image = android.util.Base64.encodeToString(bytes, android.util.Base64.DEFAULT)
+                    val result = messageRepository.sendMessage(receiverId, "", base64Image)
+                    result.onSuccess {
+                        Toast.makeText(this@Chat, "Image sent", Toast.LENGTH_SHORT).show()
+                        loadMessages() // Refresh messages
+                    }.onFailure { error ->
+                        Toast.makeText(this@Chat, "Failed to send image: ${error.message}", Toast.LENGTH_SHORT).show()
+                    }
                 } else {
-                    Toast.makeText(this, "Failed to send image", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(this@Chat, "Failed to read image", Toast.LENGTH_SHORT).show()
                 }
+            } catch (e: Exception) {
+                Toast.makeText(this@Chat, "Error: ${e.message}", Toast.LENGTH_SHORT).show()
             }
         }
     }
