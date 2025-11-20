@@ -127,8 +127,51 @@ class FollowersFollowingActivity : AppCompatActivity() {
     }
     
     private fun loadUsers() {
-        // TODO: Implement followers/following API endpoints
-        // For now, show empty list
-        Toast.makeText(this, "Followers/Following feature coming soon", Toast.LENGTH_SHORT).show()
+        lifecycleScope.launch {
+            // Use targetUserId if provided, otherwise use current user ID
+            val userId = targetUserId?.toIntOrNull() ?: sessionManager.getUserId()
+            if (userId == -1) {
+                Toast.makeText(this@FollowersFollowingActivity, "Not logged in", Toast.LENGTH_SHORT).show()
+                return@launch
+            }
+            
+            val result = if (currentMode == "followers") {
+                followRepository.getFollowers(userId)
+            } else {
+                followRepository.getFollowing(userId)
+            }
+            
+            result.onSuccess { followDataList ->
+                users.clear()
+                // Convert FollowData to User model
+                followDataList.forEach { followData ->
+                    // For followers: followData contains the follower info
+                    // For following: followData contains the following info
+                    val actualUserId = if (currentMode == "followers") {
+                        followData.followerId
+                    } else {
+                        followData.followingId
+                    }
+                    
+                    users.add(User(
+                        userId = actualUserId.toString(),
+                        username = followData.username,
+                        fullName = followData.fullName ?: "",
+                        profilePicture = followData.profilePicture ?: "",
+                        bio = "",
+                        isPrivate = false, // FollowData doesn't include privacy info
+                        isFollowing = false, // Would need additional check
+                        isFollowedBy = false // Would need additional check
+                    ))
+                }
+                userAdapter.notifyDataSetChanged()
+            }.onFailure { exception ->
+                Toast.makeText(
+                    this@FollowersFollowingActivity,
+                    "Failed to load ${if (currentMode == "followers") "followers" else "following"}: ${exception.message}",
+                    Toast.LENGTH_SHORT
+                ).show()
+            }
+        }
     }
 }

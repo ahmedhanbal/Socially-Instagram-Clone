@@ -4,7 +4,6 @@ import android.net.Uri
 import android.os.Bundle
 import android.widget.ImageButton
 import android.widget.ImageView
-import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
@@ -19,7 +18,6 @@ import com.hans.i221271_i220889.repositories.StoryRepository
 import com.hans.i221271_i220889.network.SessionManager
 import com.hans.i221271_i220889.network.ApiConfig
 import androidx.lifecycle.lifecycleScope
-import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
 import com.squareup.picasso.Picasso
 import kotlinx.coroutines.launch
 
@@ -87,23 +85,17 @@ class HomeScreen : AppCompatActivity() {
         // Get profile image URI from intent (if provided) for backward compatibility
         val imageUriString = intent.getStringExtra("PROFILE_IMAGE_URI")
         
-        // Load profile image from Firebase for bottom nav bar
+        // Load profile image for bottom nav bar
         try {
             val profileImageInFeed = findViewById<ImageButton>(R.id.tab_5)
             loadProfileImageForBottomNav(profileImageInFeed)
-            
-            // Also try to load from intent if provided (for backward compatibility)
-            if (imageUriString != null) {
-                val imageUri = Uri.parse(imageUriString)
-                profileImageInFeed.setImageURI(imageUri)
-            }
         } catch (e: Exception) {
             android.util.Log.e("HomeScreen", "Error loading profile image: ${e.message}", e)
         }
 
         // Load stories from API
         loadStoriesFromApi()
-        val uploadStory = findViewById<ImageButton>(R.id.uploadStoryButton)
+        val uploadStory = findViewById<ImageView>(R.id.uploadStoryButton)
         uploadStory?.setOnClickListener {
             val intent = Intent(this, storyUpload::class.java)
             startActivity(intent)
@@ -193,16 +185,12 @@ class HomeScreen : AppCompatActivity() {
                 // Handle story click - open story viewer with all stories
                 android.util.Log.d("HomeScreen", "Story clicked: ${clickedStory.storyId}, userId: ${clickedStory.userId}")
                 try {
+                    // Cache stories in singleton to avoid Intent size limits
+                    com.hans.i221271_i220889.utils.StoryCache.setStories(stories)
+                    
                     val intent = Intent(this@HomeScreen, storyViewOwn::class.java)
-                    // Pass only story IDs and user IDs to avoid Intent size limits (Base64 images are too large)
                     intent.putExtra("initialStoryId", clickedStory.storyId)
                     intent.putExtra("initialUserId", clickedStory.userId)
-                    
-                    // Pass list of story IDs and user IDs instead of full Story objects
-                    val storyIds = stories.map { it.storyId }.toTypedArray()
-                    val userIds = stories.map { it.userId }.toTypedArray()
-                    intent.putExtra("storyIds", storyIds)
-                    intent.putExtra("userIds", userIds)
                     
                     startActivity(intent)
                     overridePendingTransition(0, 0)
@@ -262,11 +250,16 @@ class HomeScreen : AppCompatActivity() {
                 stories.clear()
                 storyDataList.forEach { storyData ->
                     val imageUrl = ApiConfig.BASE_URL + storyData.mediaUrl
+                    val profilePicUrl = if (!storyData.profilePicture.isNullOrEmpty()) {
+                        ApiConfig.BASE_URL + storyData.profilePicture
+                    } else {
+                        ""
+                    }
                     stories.add(com.hans.i221271_i220889.models.Story(
                         storyId = storyData.id.toString(),
                         userId = storyData.userId.toString(),
                         username = storyData.username,
-                        userProfileImage = storyData.profilePicture ?: "",
+                        userProfileImage = profilePicUrl,
                         imageUrl = imageUrl,
                         videoUrl = if (storyData.mediaType == "video") imageUrl else "",
                         timestamp = System.currentTimeMillis(),
@@ -280,291 +273,42 @@ class HomeScreen : AppCompatActivity() {
         }
     }
 
-    private fun loadStoriesFromFirebase() {
-        try {
-            val currentTime = System.currentTimeMillis()
-            val currentUserId = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid
-            
-            if (currentUserId == null) {
-                // If not logged in, show all stories
-                loadAllStories(currentTime)
-                return
-            }
-            
-            // Build following list - always include current user
-            val followingList = mutableListOf<String>()
-            followingList.add(currentUserId) // Include own stories
-            
-            android.util.Log.d("HomeScreen", "Loading following list for user: $currentUserId")
-            
-            // Get user's following list to filter stories
-            // Following is stored at /following/{userId}/{followingId}
-            database.reference.child("following").child(currentUserId).get()
-                .addOnSuccessListener { followingSnapshot ->
-                    // If following node exists, add followed users
-                    if (followingSnapshot.exists()) {
-                        for (userSnapshot in followingSnapshot.children) {
-                            val userId = userSnapshot.key
-                            if (userId != null) {
-                                followingList.add(userId)
-                                android.util.Log.d("HomeScreen", "Added to following list: $userId")
-                            }
-                        }
-                    } else {
-                        android.util.Log.d("HomeScreen", "No following list found for user: $currentUserId")
-                    }
-                    
-                    android.util.Log.d("HomeScreen", "Total following list size: ${followingList.size}")
-                    
-                    // Load stories from Firebase with 24-hour expiry
-                    loadStoriesWithFilter(currentTime, followingList)
-                }
-                .addOnFailureListener { e ->
-                    android.util.Log.e("HomeScreen", "Failed to load following list: ${e.message}")
-                    // If error loading following list, still load stories (will show only own stories)
-                    loadStoriesWithFilter(currentTime, followingList)
-                }
-        } catch (e: Exception) {
-            android.util.Log.e("HomeScreen", "Error in loadStoriesFromFirebase: ${e.message}", e)
-        }
-    }
-
-    private fun loadStoriesWithFilter(currentTime: Long, followingList: List<String>) {
-        database.reference.child("stories")
-            .orderByChild("expiresAt")
-            .startAt(currentTime.toDouble())
-            .addListenerForSingleValueEvent(object : ValueEventListener {
-                override fun onDataChange(snapshot: DataSnapshot) {
-                    val storyList = mutableListOf<com.hans.i221271_i220889.models.Story>()
-                    android.util.Log.d("HomeScreen", "Stories snapshot has ${snapshot.childrenCount} children")
-
-                    for (storySnapshot in snapshot.children) {
-                        try {
-                            // FIX: Use direct property access instead of getValue(Map::class.java)
-                            val storyId = storySnapshot.child("storyId").getValue(String::class.java) ?: ""
-                            val userId = storySnapshot.child("userId").getValue(String::class.java) ?: ""
-                            val username = storySnapshot.child("username").getValue(String::class.java) ?: "User"
-                            val userProfileImage = storySnapshot.child("userProfileImageBase64").getValue(String::class.java) ?: ""
-                            val imageUrl = storySnapshot.child("imageBase64").getValue(String::class.java) ?: ""
-                            val videoUrl = storySnapshot.child("videoBase64").getValue(String::class.java) ?: ""
-                            val timestamp = storySnapshot.child("timestamp").getValue(Long::class.java) ?: System.currentTimeMillis()
-                            val expiresAt = storySnapshot.child("expiresAt").getValue(Long::class.java) ?: System.currentTimeMillis()
-
-                            // Filter: show stories from logged-in user AND users they follow
-                            if (followingList.contains(userId)) {
-                                val story = com.hans.i221271_i220889.models.Story(
-                                    storyId = storyId,
-                                    userId = userId,
-                                    username = username,
-                                    userProfileImage = userProfileImage,
-                                    imageUrl = imageUrl,
-                                    videoUrl = videoUrl,
-                                    timestamp = timestamp,
-                                    expiresAt = expiresAt
-                                )
-                                storyList.add(story)
-                                android.util.Log.d("HomeScreen", "Added story: ${story.storyId} from user: $userId")
-                            } else {
-                                android.util.Log.d("HomeScreen", "Skipped story from user: $userId (not in following list)")
-                            }
-                        } catch (e: Exception) {
-                            android.util.Log.e("HomeScreen", "Error parsing story: ${e.message}", e)
-                        }
-                    }
-
-                    android.util.Log.d("HomeScreen", "Total stories loaded: ${storyList.size}")
-
-                    // Update UI with Firebase stories
-                    updateStoriesUI(storyList)
-
-                    // Clean up expired stories
-                    cleanupExpiredStories(currentTime)
-                }
-
-                override fun onCancelled(error: DatabaseError) {
-                    android.util.Log.e("HomeScreen", "Failed to load stories: ${error.message}")
-                    Toast.makeText(this@HomeScreen, "Failed to load stories", Toast.LENGTH_SHORT).show()
-                }
-            })
-    }
-
-    // Also fix the loadAllStories method:
-    private fun loadAllStories(currentTime: Long) {
-        database.reference.child("stories")
-            .orderByChild("expiresAt")
-            .startAt(currentTime.toDouble())
-            .addListenerForSingleValueEvent(object : ValueEventListener {
-                override fun onDataChange(snapshot: DataSnapshot) {
-                    val storyList = mutableListOf<com.hans.i221271_i220889.models.Story>()
-                    for (storySnapshot in snapshot.children) {
-                        try {
-                            // FIX: Use direct property access
-                            val storyId = storySnapshot.child("storyId").getValue(String::class.java) ?: ""
-                            val userId = storySnapshot.child("userId").getValue(String::class.java) ?: ""
-                            val username = storySnapshot.child("username").getValue(String::class.java) ?: "User"
-                            val userProfileImage = storySnapshot.child("userProfileImageBase64").getValue(String::class.java) ?: ""
-                            val imageUrl = storySnapshot.child("imageBase64").getValue(String::class.java) ?: ""
-                            val videoUrl = storySnapshot.child("videoBase64").getValue(String::class.java) ?: ""
-                            val timestamp = storySnapshot.child("timestamp").getValue(Long::class.java) ?: System.currentTimeMillis()
-                            val expiresAt = storySnapshot.child("expiresAt").getValue(Long::class.java) ?: System.currentTimeMillis()
-
-                            val story = com.hans.i221271_i220889.models.Story(
-                                storyId = storyId,
-                                userId = userId,
-                                username = username,
-                                userProfileImage = userProfileImage,
-                                imageUrl = imageUrl,
-                                videoUrl = videoUrl,
-                                timestamp = timestamp,
-                                expiresAt = expiresAt
-                            )
-                            storyList.add(story)
-                            android.util.Log.d("HomeScreen", "Added story: ${story.storyId}")
-                        } catch (e: Exception) {
-                            android.util.Log.e("HomeScreen", "Error parsing story: ${e.message}", e)
-                        }
-                    }
-                    updateStoriesUI(storyList)
-                    cleanupExpiredStories(currentTime)
-                }
-
-                override fun onCancelled(error: DatabaseError) {
-                    Toast.makeText(this@HomeScreen, "Failed to load stories", Toast.LENGTH_SHORT).show()
-                }
-            })
-    }
-    
-    private fun updateStoriesUI(newStories: List<com.hans.i221271_i220889.models.Story>) {
-        runOnUiThread {
-            try {
-                android.util.Log.d("HomeScreen", "updateStoriesUI called with ${newStories.size} stories")
-                
-                // Update the class property with all stories
-                stories.clear()
-                stories.addAll(newStories)
-                
-                // Group stories by user - show only the most recent story per user
-                val groupedStories = groupStoriesByUser(stories)
-                
-                android.util.Log.d("HomeScreen", "Updating stories UI: ${stories.size} total stories, ${groupedStories.size} grouped stories")
-                
-                // Update the adapter with grouped stories
-                if (::storyAdapter.isInitialized && ::storiesRecyclerView.isInitialized) {
-                    // Update the existing adapter's data
-                    storyAdapter.updateStories(groupedStories)
-                    android.util.Log.d("HomeScreen", "Story adapter updated with ${groupedStories.size} items, adapter itemCount: ${storyAdapter.itemCount}")
-                    
-                    // Ensure adapter is set (in case it was lost)
-                    if (storiesRecyclerView.adapter != storyAdapter) {
-                        android.util.Log.w("HomeScreen", "Adapter mismatch! Re-setting adapter.")
-                        storiesRecyclerView.adapter = storyAdapter
-                    }
-                    
-                    // Force layout update
-                    storiesRecyclerView.post {
-                        storiesRecyclerView.requestLayout()
-                        storiesRecyclerView.invalidate()
-                        android.util.Log.d("HomeScreen", "RecyclerView forced layout - itemCount: ${storyAdapter.itemCount}, width: ${storiesRecyclerView.width}")
-                    }
-                } else {
-                    android.util.Log.e("HomeScreen", "Story adapter or RecyclerView not initialized! adapter: ${::storyAdapter.isInitialized}, recyclerView: ${::storiesRecyclerView.isInitialized}")
-                }
-            } catch (e: Exception) {
-                // If story UI update fails, continue without stories
-                android.util.Log.e("HomeScreen", "Error displaying stories: ${e.message}", e)
-                e.printStackTrace()
-            }
-        }
-    }
-    
-    private fun groupStoriesByUser(stories: List<com.hans.i221271_i220889.models.Story>): List<com.hans.i221271_i220889.models.Story> {
-        // Group stories by userId and keep only the most recent one per user
-        val storyMap = mutableMapOf<String, com.hans.i221271_i220889.models.Story>()
-        
-        for (story in stories) {
-            val existingStory = storyMap[story.userId]
-            if (existingStory == null || story.timestamp > existingStory.timestamp) {
-                storyMap[story.userId] = story
-            }
-        }
-        
-        // Return stories sorted by timestamp (most recent first)
-        return storyMap.values.sortedByDescending { it.timestamp }
-    }
-    
-    
-    private fun cleanupExpiredStories(currentTime: Long) {
-        try {
-            // Remove expired stories from Firebase
-            database.reference.child("stories")
-                .orderByChild("expiresAt")
-                .endAt(currentTime.toDouble())
-                .addListenerForSingleValueEvent(object : ValueEventListener {
-                    override fun onDataChange(snapshot: DataSnapshot) {
-                        val expiredStoryIds = mutableListOf<String>()
-                        for (storySnapshot in snapshot.children) {
-                            expiredStoryIds.add(storySnapshot.key ?: "")
-                        }
-                        
-                        // Remove expired stories
-                        expiredStoryIds.forEach { storyId ->
-                            database.reference.child("stories").child(storyId).removeValue()
-                        }
-                    }
-                    
-                    override fun onCancelled(error: DatabaseError) {
-                        // Handle error silently
-                    }
-                })
-        } catch (e: Exception) {
-            // If Firebase is not initialized, continue without cleanup
-        }
-    }
-    
     private fun loadProfileImageForBottomNav(profileImageButton: ImageButton) {
-        val currentUser = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser
-        if (currentUser != null) {
-            database.reference
-                .child("users")
-                .child(currentUser.uid)
-                .child("profileImageBase64")
-                .addListenerForSingleValueEvent(object : ValueEventListener {
-                    override fun onDataChange(snapshot: DataSnapshot) {
-                        val profileImageBase64 = snapshot.getValue(String::class.java) ?: ""
-                        if (profileImageBase64.isNotEmpty()) {
-                            try {
-                                val bitmap = com.hans.i221271_i220889.utils.Base64Image.base64ToBitmap(profileImageBase64)
-                                if (bitmap != null) {
-                                    runOnUiThread {
-                                        profileImageButton.setImageBitmap(bitmap)
-                                    }
-                                } else {
-                                    runOnUiThread {
-                                        profileImageButton.setImageResource(R.drawable.ic_default_profile)
-                                    }
-                                }
-                            } catch (e: Exception) {
-                                android.util.Log.e("HomeScreen", "Error decoding profile image: ${e.message}", e)
-                                runOnUiThread {
-                                    profileImageButton.setImageResource(R.drawable.ic_default_profile)
-                                }
-                            }
+        lifecycleScope.launch {
+            try {
+                val userId = sessionManager.getUserId()
+                if (userId == -1) {
+                    profileImageButton.setImageResource(R.drawable.ic_default_profile)
+                    return@launch
+                }
+                
+                val result = com.hans.i221271_i220889.repositories.ProfileRepository(this@HomeScreen)
+                    .getProfile(userId)
+                
+                result.onSuccess { profile ->
+                    runOnUiThread {
+                        if (!profile.profilePicture.isNullOrEmpty()) {
+                            val imageUrl = ApiConfig.BASE_URL + profile.profilePicture
+                            Picasso.get()
+                                .load(imageUrl)
+                                .placeholder(R.drawable.ic_default_profile)
+                                .error(R.drawable.ic_default_profile)
+                                .into(profileImageButton)
                         } else {
-                            runOnUiThread {
-                                profileImageButton.setImageResource(R.drawable.ic_default_profile)
-                            }
-                        }
-                    }
-                    
-                    override fun onCancelled(error: DatabaseError) {
-                        android.util.Log.e("HomeScreen", "Failed to load profile image: ${error.message}")
-                        runOnUiThread {
                             profileImageButton.setImageResource(R.drawable.ic_default_profile)
                         }
                     }
-                })
-        } else {
-            profileImageButton.setImageResource(R.drawable.ic_default_profile)
+                }.onFailure {
+                    runOnUiThread {
+                        profileImageButton.setImageResource(R.drawable.ic_default_profile)
+                    }
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("HomeScreen", "Error loading profile image: ${e.message}", e)
+                runOnUiThread {
+                    profileImageButton.setImageResource(R.drawable.ic_default_profile)
+                }
+            }
         }
     }
     

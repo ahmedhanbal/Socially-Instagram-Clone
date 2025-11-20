@@ -129,12 +129,13 @@ class signup : AppCompatActivity() {
             createButton.isEnabled = false // Prevent double click
             CoroutineScope(Dispatchers.IO).launch {
                 try {
-                    val response = ApiClient.apiService.signup(
+                    val request = com.hans.i221271_i220889.network.SignupRequest(
                         username = username,
                         email = email,
                         password = password,
                         fullName = null
                     )
+                    val response = ApiClient.apiService.signup(request)
                     
                     withContext(Dispatchers.Main) {
                         createButton.isEnabled = true
@@ -296,12 +297,13 @@ class signup : AppCompatActivity() {
                 isEnabled = false
                 CoroutineScope(Dispatchers.IO).launch {
                     try {
-                        val response = ApiClient.apiService.signup(
+                        val request = com.hans.i221271_i220889.network.SignupRequest(
                             username = username,
                             email = email,
                             password = password,
                             fullName = null
                         )
+                        val response = ApiClient.apiService.signup(request)
                         
                         withContext(Dispatchers.Main) {
                             isEnabled = true

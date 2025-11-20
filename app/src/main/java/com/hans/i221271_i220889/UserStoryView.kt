@@ -12,11 +12,10 @@ import androidx.core.view.WindowInsetsCompat
 import com.hans.i221271_i220889.models.Story
 import com.hans.i221271_i220889.utils.Base64Image
 import com.hans.i221271_i220889.network.SessionManager
-import java.text.SimpleDateFormat
-import java.util.*
 
 class UserStoryView : AppCompatActivity() {
     private lateinit var story: Story
+    private lateinit var sessionManager: SessionManager
     
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -28,6 +27,9 @@ class UserStoryView : AppCompatActivity() {
             insets
         }
 
+        // Initialize SessionManager
+        sessionManager = SessionManager(this)
+        
         // Get story from intent
         story = intent.getSerializableExtra("story") as? Story
             ?: Story() // Fallback if story not provided
@@ -107,7 +109,7 @@ class UserStoryView : AppCompatActivity() {
     private fun setupProfileClick() {
         val profileImageView = findViewById<ImageView>(R.id.profile_image)
         profileImageView?.setOnClickListener {
-            val currentUserId = FirebaseAuth.getInstance().currentUser?.uid
+            val currentUserId = sessionManager.getUserId().toString()
             if (story.userId == currentUserId) {
                 // Navigate to own profile
                 val intent = Intent(this, OwnProfile::class.java)
@@ -124,15 +126,7 @@ class UserStoryView : AppCompatActivity() {
     }
     
     private fun markStoryAsViewed() {
-        val currentUserId = FirebaseAuth.getInstance().currentUser?.uid
-        if (currentUserId != null && story.storyId.isNotEmpty()) {
-            // Mark story as viewed by adding current user to viewers list
-            FirebaseDatabase.getInstance().reference
-                .child("stories")
-                .child(story.storyId)
-                .child("viewers")
-                .child(currentUserId)
-                .setValue(true)
-        }
+        // Story views are tracked on the backend
+        // No client-side marking needed
     }
 }

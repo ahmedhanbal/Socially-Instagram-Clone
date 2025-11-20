@@ -101,7 +101,7 @@ class PostsActivity : AppCompatActivity() {
                 
                 // Update title with post count
                 val titleTextView = findViewById<TextView>(R.id.titleTextView)
-                titleTextView?.text = "${userPosts.size} Posts"
+                titleTextView?.text = "${posts.size} Posts"
             }
         }
     }

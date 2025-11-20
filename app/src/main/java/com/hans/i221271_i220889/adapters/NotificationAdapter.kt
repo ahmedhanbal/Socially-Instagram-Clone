@@ -8,8 +8,8 @@ import android.widget.*
 import androidx.recyclerview.widget.RecyclerView
 import com.hans.i221271_i220889.R
 import com.hans.i221271_i220889.models.Notification
-import com.hans.i221271_i220889.utils.Base64Image
-import com.google.firebase.auth.FirebaseAuth
+import com.hans.i221271_i220889.network.ApiConfig
+import com.squareup.picasso.Picasso
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -36,20 +36,20 @@ class NotificationAdapter(
         val notification = notifications[position]
         
         // Set profile image
-        if (notification.fromUserProfileImage.isNotEmpty()) {
-            try {
-                val bitmap = Base64Image.base64ToBitmap(notification.fromUserProfileImage)
-                holder.profileImage.setImageBitmap(bitmap)
-            } catch (e: Exception) {
-                holder.profileImage.setImageResource(R.drawable.ic_default_profile)
-            }
+        if (notification.profilePicture.isNotEmpty()) {
+            val imageUrl = ApiConfig.BASE_URL + notification.profilePicture
+            Picasso.get()
+                .load(imageUrl)
+                .placeholder(R.drawable.ic_default_profile)
+                .error(R.drawable.ic_default_profile)
+                .into(holder.profileImage)
         } else {
             holder.profileImage.setImageResource(R.drawable.ic_default_profile)
         }
         
         // Set title and body
         holder.titleText.text = notification.title
-        holder.bodyText.text = notification.body
+        holder.bodyText.text = notification.message.ifEmpty { notification.body }
         
         // Set time
         val timeFormat = SimpleDateFormat("MMM dd, HH:mm", Locale.getDefault())

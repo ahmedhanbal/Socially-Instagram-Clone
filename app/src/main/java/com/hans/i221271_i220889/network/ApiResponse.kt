@@ -22,19 +22,50 @@ data class ApiResponse<T>(
     fun isError(): Boolean = status == "error"
 }
 
-// Auth related responses
-data class AuthData(
-    @SerializedName("user_id")
-    val userId: Int,
-    
+// Request bodies
+data class SignupRequest(
     @SerializedName("username")
     val username: String,
     
     @SerializedName("email")
     val email: String,
     
+    @SerializedName("password")
+    val password: String,
+    
+    @SerializedName("full_name")
+    val fullName: String? = null
+)
+
+data class LoginRequest(
+    @SerializedName("username")
+    val username: String,
+    
+    @SerializedName("password")
+    val password: String,
+    
+    @SerializedName("fcm_token")
+    val fcmToken: String? = null
+)
+
+// Auth related responses
+data class AuthData(
     @SerializedName("token")
     val token: String,
+    
+    @SerializedName("user")
+    val user: UserData
+)
+
+data class UserData(
+    @SerializedName("id")
+    val id: Int,
+    
+    @SerializedName("username")
+    val username: String,
+    
+    @SerializedName("email")
+    val email: String,
     
     @SerializedName("full_name")
     val fullName: String?,

@@ -126,28 +126,18 @@ class ProfilePictureUpdateActivity : AppCompatActivity() {
             return
         }
         
-        try {
-            // Convert image to Base64
-            val base64Image = Base64Image.uriToBase64(this, selectedImageUri!!, 70)
-            if (base64Image != null) {
-                lifecycleScope.launch {
-                    val result = profileRepository.updateProfile(profilePicture = base64Image)
-                    result.onSuccess {
-                        sessionManager.updateProfilePicture(base64Image)
-                        Toast.makeText(this@ProfilePictureUpdateActivity, "Profile picture updated successfully!", Toast.LENGTH_SHORT).show()
-                        finish()
-                    }.onFailure { error ->
-                        Toast.makeText(this@ProfilePictureUpdateActivity, "Failed to update: ${error.message}", Toast.LENGTH_SHORT).show()
-                    }
+        lifecycleScope.launch {
+            try {
+                val result = profileRepository.uploadPicture(selectedImageUri!!, "profile_picture")
+                result.onSuccess { imageUrl ->
+                    Toast.makeText(this@ProfilePictureUpdateActivity, "Profile picture updated successfully!", Toast.LENGTH_SHORT).show()
+                    finish()
+                }.onFailure { error ->
+                    Toast.makeText(this@ProfilePictureUpdateActivity, "Failed to update: ${error.message}", Toast.LENGTH_SHORT).show()
                 }
-            } else {
-                Toast.makeText(this, "Failed to process image", Toast.LENGTH_SHORT).show()
-            } else {
-                Toast.makeText(this, "User not logged in", Toast.LENGTH_SHORT).show()
+            } catch (e: Exception) {
+                Toast.makeText(this@ProfilePictureUpdateActivity, "Error: ${e.message}", Toast.LENGTH_SHORT).show()
             }
-        } catch (e: Exception) {
-            Toast.makeText(this, "Demo mode - Profile picture updated!", Toast.LENGTH_SHORT).show()
-            finish()
         }
     }
 }

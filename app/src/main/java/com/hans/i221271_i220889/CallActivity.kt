@@ -15,10 +15,12 @@ import com.hans.i221271_i220889.utils.AgoraCallManager
 import com.hans.i221271_i220889.utils.Base64Image
 import com.hans.i221271_i220889.repositories.ProfileRepository
 import com.hans.i221271_i220889.network.SessionManager
+import com.hans.i221271_i220889.network.ApiConfig
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.launch
 import android.view.SurfaceView
 import android.widget.FrameLayout
+import com.squareup.picasso.Picasso
 
 class CallActivity : AppCompatActivity() {
     
@@ -272,22 +274,18 @@ class CallActivity : AppCompatActivity() {
         
         lifecycleScope.launch {
             try {
-                val result = profileRepository.getUserProfile(userId)
+                val result = profileRepository.getProfile(userId)
                 result.onSuccess { userData ->
                     val profilePic = userData.profilePicture
-                    if (!profilePic.isNullOrEmpty()) {
-                        val bitmap = Base64Image.base64ToBitmap(profilePic)
-                        if (bitmap != null) {
-                            runOnUiThread {
-                                profileImageView.setImageBitmap(bitmap)
-                            }
+                    runOnUiThread {
+                        if (!profilePic.isNullOrEmpty()) {
+                            val imageUrl = ApiConfig.BASE_URL + profilePic
+                            Picasso.get()
+                                .load(imageUrl)
+                                .placeholder(R.drawable.ic_default_profile)
+                                .error(R.drawable.ic_default_profile)
+                                .into(profileImageView)
                         } else {
-                            runOnUiThread {
-                                profileImageView.setImageResource(R.drawable.ic_default_profile)
-                            }
-                        }
-                    } else {
-                        runOnUiThread {
                             profileImageView.setImageResource(R.drawable.ic_default_profile)
                         }
                     }

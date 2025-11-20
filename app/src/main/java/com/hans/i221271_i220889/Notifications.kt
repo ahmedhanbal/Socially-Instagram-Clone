@@ -13,12 +13,16 @@ import androidx.recyclerview.widget.RecyclerView
 import com.hans.i221271_i220889.adapters.NotificationAdapter
 import com.hans.i221271_i220889.models.Notification
 import com.hans.i221271_i220889.network.SessionManager
+import com.hans.i221271_i220889.repositories.NotificationRepository
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.launch
 
 class Notifications : AppCompatActivity() {
     
     private lateinit var notificationsRecyclerView: RecyclerView
     private lateinit var notificationAdapter: NotificationAdapter
     private lateinit var sessionManager: SessionManager
+    private lateinit var notificationRepository: NotificationRepository
     private val notifications = mutableListOf<Notification>()
     
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -67,9 +71,10 @@ class Notifications : AppCompatActivity() {
         
         // Setup notifications RecyclerView
         sessionManager = SessionManager(this)
+        notificationRepository = NotificationRepository(this)
         setupNotificationsRecyclerView()
         
-        // Load notifications from API (to be implemented)
+        // Load notifications from API
         loadNotifications()
     }
     
@@ -83,16 +88,42 @@ class Notifications : AppCompatActivity() {
     }
     
     private fun loadNotifications() {
-        // TODO: Implement notifications API endpoint
-        // For now, notifications list is empty
-        android.util.Log.d("Notifications", "Notifications feature to be implemented with API")
+        lifecycleScope.launch {
+            val result = notificationRepository.getNotifications()
+            result.onSuccess { notificationDataList ->
+                notifications.clear()
+                // Convert NotificationData to Notification model
+                notificationDataList.forEach { notificationData ->
+                    notifications.add(Notification(
+                        notificationId = notificationData.id.toString(),
+                        type = notificationData.type,
+                        title = notificationData.title,
+                        message = notificationData.message,
+                        fromUserId = notificationData.relatedUserId?.toString() ?: "",
+                        fromUsername = notificationData.relatedUserName ?: "",
+                        profilePicture = notificationData.relatedUserPicture ?: "",
+                        postId = notificationData.relatedItemId?.toString() ?: "",
+                        timestamp = notificationData.createdAt,
+                        isRead = notificationData.isRead,
+                        channelName = "", // Not stored in backend
+                        callType = "" // Not stored in backend
+                    ))
+                }
+                notificationAdapter.notifyDataSetChanged()
+            }.onFailure { exception ->
+                Toast.makeText(this@Notifications, "Failed to load notifications: ${exception.message}", Toast.LENGTH_SHORT).show()
+            }
+        }
     }
     
     private fun handleNotificationClick(notification: Notification) {
-        // Mark as read - to be implemented with API
+        // Mark as read
         if (!notification.isRead) {
-            // TODO: Call API to mark notification as read
-            android.util.Log.d("Notifications", "Mark notification as read: ${notification.notificationId}")
+            lifecycleScope.launch {
+                notificationRepository.markAsRead(notification.notificationId.toInt())
+                notification.isRead = true
+                notificationAdapter.notifyDataSetChanged()
+            }
         }
         
         when (notification.type) {

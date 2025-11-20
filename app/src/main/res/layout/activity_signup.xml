@@ -147,14 +147,14 @@
         <androidx.appcompat.widget.AppCompatButton
             android:id="@+id/createAccountBtn"
             android:layout_width="330dp"
-            android:layout_height="0dp"
-            android:layout_weight="5"
+            android:layout_height="33dp"
             android:layout_gravity="center"
-            android:text="Create an Account"
-            android:textStyle="bold"
-            android:textColor="@color/white"
+            android:layout_marginTop="20dp"
+            android:layout_weight="5"
             android:background="@drawable/rounded_button"
-            android:layout_marginTop="20dp"/>
+            android:text="Create new Account"
+            android:textColor="@color/white"
+            android:textStyle="bold" />
 
         <LinearLayout
             android:layout_width="match_parent"

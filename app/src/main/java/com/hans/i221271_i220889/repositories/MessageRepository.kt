@@ -33,7 +33,7 @@ class MessageRepository(private val context: Context) {
                 messageText = messageText.toRequestBody("text/plain".toMediaTypeOrNull()),
                 media = null,
                 mediaType = "text".toRequestBody("text/plain".toMediaTypeOrNull()),
-                isVanish = if (isVanish) "1" else "0".toRequestBody("text/plain".toMediaTypeOrNull())
+                isVanish = (if (isVanish) "1" else "0").toRequestBody("text/plain".toMediaTypeOrNull())
             )
             
             if (response.isSuccessful && response.body()?.isSuccess() == true) {

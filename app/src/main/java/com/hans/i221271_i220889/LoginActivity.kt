@@ -17,7 +17,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 class LoginActivity : AppCompatActivity() {
-    private lateinit var authManager: FirebaseAuthManager
     private lateinit var sessionManager: SessionManager
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -30,12 +29,6 @@ class LoginActivity : AppCompatActivity() {
             val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
             v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom)
             insets
-        }
-
-        try {
-            authManager = FirebaseAuthManager()
-        } catch (e: Exception) {
-            Toast.makeText(this, "Firebase initialization failed: ${e.message}", Toast.LENGTH_LONG).show()
         }
         
         sessionManager = SessionManager(this)
@@ -74,11 +67,12 @@ class LoginActivity : AppCompatActivity() {
             loginButton.isEnabled = false
             CoroutineScope(Dispatchers.IO).launch {
                 try {
-                    val response = ApiClient.apiService.login(
+                    val request = com.hans.i221271_i220889.network.LoginRequest(
                         username = email, // Can be email or username
                         password = password,
                         fcmToken = null // TODO: Get from FCM later
                     )
+                    val response = ApiClient.apiService.login(request)
                     
                     withContext(Dispatchers.Main) {
                         loginButton.isEnabled = true

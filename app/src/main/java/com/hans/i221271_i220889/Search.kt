@@ -177,14 +177,14 @@ class Search : AppCompatActivity() {
     private fun setupSearchResultsRecyclerView() {
         userAdapter = UserAdapter(searchResults) { user ->
             // Handle user click - navigate to user profile (NOT send follow request)
-            val currentUser = authManager.getCurrentUser()
-            if (currentUser != null && currentUser.userId != user.userId) {
+            val currentUserId = sessionManager.getUserId().toString()
+            if (currentUserId != "-1" && currentUserId != user.userId) {
                 // Navigate to UserProfile activity - DO NOT SEND FOLLOW REQUEST
                 val intent = Intent(this, UserProfile::class.java)
                 intent.putExtra("userId", user.userId)
                 intent.putExtra("username", user.username)
                 startActivity(intent)
-            } else if (currentUser != null && currentUser.userId == user.userId) {
+            } else if (currentUserId != "-1" && currentUserId == user.userId) {
                 // If clicking on own profile, go to OwnProfile
                 val intent = Intent(this, OwnProfile::class.java)
                 startActivity(intent)
@@ -213,8 +213,10 @@ class Search : AppCompatActivity() {
                         userId = userData.id.toString(),
                         username = userData.username,
                         email = userData.email,
-                        profilePictureBase64 = userData.profilePicture ?: "",
+                        fullName = userData.fullName ?: "",
                         bio = userData.bio ?: "",
+                        profilePicture = userData.profilePicture ?: "",
+                        isPrivate = userData.isPrivate,
                         followersCount = userData.followersCount,
                         followingCount = userData.followingCount
                     ))
@@ -223,77 +225,6 @@ class Search : AppCompatActivity() {
             }.onFailure { error ->
                 Toast.makeText(this@Search, "Search failed: ${error.message}", Toast.LENGTH_SHORT).show()
             }
-        }
-    }
-    
-    private fun searchAllUsers(query: String) {
-        try {
-            database.reference.child("users")
-                .orderByChild("username")
-                .startAt(query)
-                .endAt(query + "\uf8ff")
-                .addListenerForSingleValueEvent(object : ValueEventListener {
-                    override fun onDataChange(snapshot: DataSnapshot) {
-                        val users = mutableListOf<User>()
-                        for (userSnapshot in snapshot.children) {
-                            val user = userSnapshot.getValue(User::class.java)
-                            if (user != null) {
-                                users.add(user)
-                            }
-                        }
-                        
-                        runOnUiThread {
-                            searchResults.clear()
-                            searchResults.addAll(users)
-                            userAdapter.notifyDataSetChanged()
-                            Toast.makeText(this@Search, "Found ${users.size} users", Toast.LENGTH_SHORT).show()
-                        }
-                    }
-                    
-                    override fun onCancelled(error: DatabaseError) {
-                        runOnUiThread {
-                            Toast.makeText(this@Search, "Search failed", Toast.LENGTH_SHORT).show()
-                        }
-                    }
-                })
-        } catch (e: Exception) {
-            Toast.makeText(this, "Demo mode - Search functionality", Toast.LENGTH_SHORT).show()
-        }
-    }
-    
-    private fun searchInFollowers(query: String, userId: String) {
-        try {
-            followManager.getFollowers(userId) { followers ->
-                val filteredFollowers = followers.filter { 
-                    it.username.contains(query, ignoreCase = true) 
-                }
-                runOnUiThread {
-                    searchResults.clear()
-                    searchResults.addAll(filteredFollowers)
-                    userAdapter.notifyDataSetChanged()
-                    Toast.makeText(this@Search, "Found ${filteredFollowers.size} followers", Toast.LENGTH_SHORT).show()
-                }
-            }
-        } catch (e: Exception) {
-            Toast.makeText(this, "Demo mode - Search in followers", Toast.LENGTH_SHORT).show()
-        }
-    }
-    
-    private fun searchInFollowing(query: String, userId: String) {
-        try {
-            followManager.getFollowing(userId) { following ->
-                val filteredFollowing = following.filter { 
-                    it.username.contains(query, ignoreCase = true) 
-                }
-                runOnUiThread {
-                    searchResults.clear()
-                    searchResults.addAll(filteredFollowing)
-                    userAdapter.notifyDataSetChanged()
-                    Toast.makeText(this@Search, "Found ${filteredFollowing.size} following", Toast.LENGTH_SHORT).show()
-                }
-            }
-        } catch (e: Exception) {
-            Toast.makeText(this, "Demo mode - Search in following", Toast.LENGTH_SHORT).show()
         }
     }
 }

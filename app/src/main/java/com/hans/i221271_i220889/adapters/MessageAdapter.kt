@@ -8,17 +8,14 @@ import androidx.recyclerview.widget.RecyclerView
 import com.hans.i221271_i220889.R
 import com.hans.i221271_i220889.utils.Base64Image
 import com.hans.i221271_i220889.utils.ChatMessage
-import com.google.firebase.auth.FirebaseAuth
 import java.text.SimpleDateFormat
 import java.util.*
 
 class MessageAdapter(
     private val messages: MutableList<ChatMessage>,
+    private val currentUserId: String,
     private val onMessageLongClick: (ChatMessage) -> Unit
 ) : RecyclerView.Adapter<MessageAdapter.MessageViewHolder>() {
-
-    private val auth = FirebaseAuth.getInstance()
-    private val currentUserId = auth.currentUser?.uid
 
     class MessageViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
         val messageText: TextView = itemView.findViewById(R.id.messageText)

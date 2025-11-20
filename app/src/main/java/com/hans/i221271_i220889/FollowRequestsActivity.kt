@@ -87,15 +87,57 @@ class FollowRequestsActivity : AppCompatActivity() {
     
     private fun setupFollowRequestsRecyclerView() {
         requestsAdapter = FollowRequestsAdapter(pendingRequests) { user, action ->
-            // TODO: Implement accept/reject follow request API
-            Toast.makeText(this, "Follow requests feature coming soon", Toast.LENGTH_SHORT).show()
+            handleFollowRequest(user, action)
         }
         requestsRecyclerView.adapter = requestsAdapter
     }
     
+    private fun handleFollowRequest(user: User, action: String) {
+        lifecycleScope.launch {
+            val accept = action == "accept"
+            // The user.userId contains the follow relationship ID from FollowData
+            val result = followRepository.respondToFollowRequest(user.userId.toInt(), accept)
+            result.onSuccess {
+                pendingRequests.remove(user)
+                requestsAdapter.notifyDataSetChanged()
+                Toast.makeText(
+                    this@FollowRequestsActivity,
+                    if (accept) "Request accepted" else "Request rejected",
+                    Toast.LENGTH_SHORT
+                ).show()
+            }.onFailure { exception ->
+                Toast.makeText(
+                    this@FollowRequestsActivity,
+                    "Failed: ${exception.message}",
+                    Toast.LENGTH_SHORT
+                ).show()
+            }
+        }
+    }
+    
     private fun loadPendingFollowRequests() {
-        // TODO: Implement follow requests API endpoint
-        // For now, show empty list
-        android.util.Log.d("FollowRequests", "Follow requests feature to be implemented")
+        lifecycleScope.launch {
+            val result = followRepository.getPendingRequests()
+            result.onSuccess { followDataList ->
+                pendingRequests.clear()
+                // Convert FollowData to User model
+                // Note: FollowData.id is the follow relationship ID, follower_id is the requester
+                followDataList.forEach { followData ->
+                    pendingRequests.add(User(
+                        userId = followData.id.toString(), // Store follow ID for responding
+                        username = followData.username,
+                        fullName = followData.fullName ?: "",
+                        profilePicture = followData.profilePicture ?: "",
+                        bio = "",
+                        isPrivate = false,
+                        isFollowing = false,
+                        isFollowedBy = false
+                    ))
+                }
+                requestsAdapter.notifyDataSetChanged()
+            }.onFailure { exception ->
+                Toast.makeText(this@FollowRequestsActivity, "Failed to load requests: ${exception.message}", Toast.LENGTH_SHORT).show()
+            }
+        }
     }
 }

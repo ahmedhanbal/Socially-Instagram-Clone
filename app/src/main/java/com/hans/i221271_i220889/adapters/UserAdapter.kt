@@ -8,6 +8,9 @@ import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
 import com.hans.i221271_i220889.R
 import com.hans.i221271_i220889.models.User
+import com.hans.i221271_i220889.network.ApiConfig
+import com.hans.i221271_i220889.utils.Base64Image
+import com.squareup.picasso.Picasso
 
 class UserAdapter(
     private val users: List<User>,
@@ -30,21 +33,34 @@ class UserAdapter(
         val user = users[position]
         
         holder.usernameText.text = user.username
-        holder.userStatusText.text = if (user.isOnline) "Online" else "Offline"
+        holder.userStatusText.text = user.fullName.ifEmpty { if (user.isOnline) "Online" else "Offline" }
         
-        // Set profile image (using profileImageBase64 for Realtime Database)
-        val profileImage = if (user.profileImageBase64.isNotEmpty()) {
-            user.profileImageBase64
-        } else {
-            user.profileImageUrl // Fallback for backward compatibility
+        // Set profile image (URL or Base64)
+        val profileImage = user.profilePicture.ifEmpty { 
+            user.profileImageBase64.ifEmpty { user.profileImageUrl }
         }
         
         if (profileImage.isNotEmpty()) {
-            try {
-                val bitmap = com.hans.i221271_i220889.utils.Base64Image.base64ToBitmap(profileImage)
-                holder.profileImageView.setImageBitmap(bitmap)
-            } catch (e: Exception) {
-                holder.profileImageView.setImageResource(R.drawable.ic_default_profile)
+            if (profileImage.startsWith("http") || profileImage.startsWith("uploads/")) {
+                // Load from URL using Picasso
+                val imageUrl = if (profileImage.startsWith("http")) {
+                    profileImage
+                } else {
+                    ApiConfig.BASE_URL + profileImage
+                }
+                Picasso.get()
+                    .load(imageUrl)
+                    .placeholder(R.drawable.ic_default_profile)
+                    .error(R.drawable.ic_default_profile)
+                    .into(holder.profileImageView)
+            } else {
+                // Fallback to Base64
+                try {
+                    val bitmap = Base64Image.base64ToBitmap(profileImage)
+                    holder.profileImageView.setImageBitmap(bitmap)
+                } catch (e: Exception) {
+                    holder.profileImageView.setImageResource(R.drawable.ic_default_profile)
+                }
             }
         } else {
             holder.profileImageView.setImageResource(R.drawable.ic_default_profile)

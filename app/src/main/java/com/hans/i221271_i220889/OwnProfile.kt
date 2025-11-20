@@ -27,7 +27,7 @@ import com.squareup.picasso.Picasso
 import kotlinx.coroutines.launch
 
 class OwnProfile : AppCompatActivity() {
-    
+
     private lateinit var profileRepository: ProfileRepository
     private lateinit var postRepository: PostRepositoryApi
     private lateinit var followRepository: FollowRepository
@@ -38,7 +38,7 @@ class OwnProfile : AppCompatActivity() {
     private lateinit var highlightsAdapter: StoryAdapter
     private val posts = mutableListOf<Post>()
     private val highlights = mutableListOf<Story>()
-    
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
@@ -54,7 +54,7 @@ class OwnProfile : AppCompatActivity() {
         profileRepository = ProfileRepository(this)
         postRepository = PostRepositoryApi(this)
         followRepository = FollowRepository(this)
-        
+
         setupPostsRecyclerView()
         setupHighlightsRecyclerView()
         setupMenuButton()
@@ -90,7 +90,7 @@ class OwnProfile : AppCompatActivity() {
             overridePendingTransition(0, 0)
             finish()
         }
-        
+
         // Add create post button access
         val createPostBtn = findViewById<ImageButton?>(R.id.tab_3_plus)
         createPostBtn?.setOnClickListener {
@@ -98,7 +98,7 @@ class OwnProfile : AppCompatActivity() {
             startActivityForResult(intentCreatePost, 100)
         }
     }
-    
+
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
         if (requestCode == 100 && resultCode == RESULT_OK) {
@@ -106,7 +106,7 @@ class OwnProfile : AppCompatActivity() {
             loadUserPosts()
         }
     }
-    
+
     private fun setupPostsRecyclerView() {
         postsRecyclerView = findViewById(R.id.postsRecyclerView)
         postAdapter = PostAdapter(posts, postRepository, sessionManager, lifecycleScope) { post ->
@@ -118,7 +118,7 @@ class OwnProfile : AppCompatActivity() {
         postsRecyclerView.layoutManager = LinearLayoutManager(this)
         postsRecyclerView.adapter = postAdapter
     }
-    
+
     private fun setupHighlightsRecyclerView() {
         highlightsRecyclerView = findViewById(R.id.highlightsRecyclerView)
         highlightsAdapter = StoryAdapter(highlights) { story ->
@@ -127,49 +127,57 @@ class OwnProfile : AppCompatActivity() {
             intent.putExtra("story", story)
             startActivity(intent)
         }
-        highlightsRecyclerView.layoutManager = LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false)
+        highlightsRecyclerView.layoutManager =
+            LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false)
         highlightsRecyclerView.adapter = highlightsAdapter
     }
-    
+
     private fun loadUserPosts() {
         val userId = sessionManager.getUserId()
         if (userId == -1) return
-        
+
         lifecycleScope.launch {
             val result = postRepository.getUserPosts(userId)
             result.onSuccess { postDataList ->
                 // Convert API PostData to model Post
                 posts.clear()
                 postDataList.forEach { postData ->
-                    posts.add(Post(
-                        postId = postData.id.toString(),
-                        userId = postData.userId.toString(),
-                        username = postData.username,
-                        userProfileImageBase64 = postData.profilePicture ?: "",
-                        caption = postData.caption ?: "",
-                        imageBase64 = postData.mediaUrl ?: "",
-                        videoBase64 = if (postData.mediaType == "video") postData.mediaUrl ?: "" else "",
-                        timestamp = System.currentTimeMillis(), // Would need proper parsing
-                        likesCount = postData.likesCount,
-                        commentsCount = postData.commentsCount,
-                        isLikedByCurrentUser = postData.isLiked
-                    ))
+                    posts.add(
+                        Post(
+                            postId = postData.id.toString(),
+                            userId = postData.userId.toString(),
+                            username = postData.username,
+                            userProfileImageBase64 = postData.profilePicture ?: "",
+                            caption = postData.caption ?: "",
+                            imageBase64 = postData.mediaUrl ?: "",
+                            videoBase64 = if (postData.mediaType == "video") postData.mediaUrl
+                                ?: "" else "",
+                            timestamp = System.currentTimeMillis(), // Would need proper parsing
+                            likesCount = postData.likesCount,
+                            commentsCount = postData.commentsCount,
+                            isLikedByCurrentUser = postData.isLiked
+                        )
+                    )
                 }
                 postAdapter.notifyDataSetChanged()
-                
+
                 // Update posts count
                 val postsTextView = findViewById<android.widget.TextView>(R.id.Posts)
                 postsTextView.text = "${posts.size}\nposts"
             }.onFailure { error ->
-                Toast.makeText(this@OwnProfile, "Failed to load posts: ${error.message}", Toast.LENGTH_SHORT).show()
+                Toast.makeText(
+                    this@OwnProfile,
+                    "Failed to load posts: ${error.message}",
+                    Toast.LENGTH_SHORT
+                ).show()
             }
         }
     }
-    
+
     private fun loadUserStats() {
         val userId = sessionManager.getUserId()
         if (userId == -1) return
-        
+
         lifecycleScope.launch {
             // Load followers
             val followersResult = followRepository.getFollowers(userId)
@@ -184,7 +192,7 @@ class OwnProfile : AppCompatActivity() {
                 }
                 followersTextView.isClickable = true
             }
-            
+
             // Load following
             val followingResult = followRepository.getFollowing(userId)
             followingResult.onSuccess { following ->
@@ -199,7 +207,7 @@ class OwnProfile : AppCompatActivity() {
                 followingTextView.isClickable = true
             }
         }
-        
+
         // Make posts clickable
         val postsTextView = findViewById<android.widget.TextView>(R.id.Posts)
         postsTextView.setOnClickListener {
@@ -209,7 +217,7 @@ class OwnProfile : AppCompatActivity() {
         }
         postsTextView.isClickable = true
     }
-    
+
     private fun loadUserProfile() {
         lifecycleScope.launch {
             val result = profileRepository.getOwnProfile()
@@ -217,25 +225,26 @@ class OwnProfile : AppCompatActivity() {
                 // Update username
                 val usernameTextView = findViewById<android.widget.TextView>(R.id.header_title)
                 usernameTextView.text = profile.username
-                
+
                 val usernameTextView2 = findViewById<android.widget.TextView>(R.id.header_title_2)
                 usernameTextView2.text = profile.username
-                
+
                 val usernameTextView3 = findViewById<android.widget.TextView>(R.id.header_title_3)
                 usernameTextView3.text = "@${profile.username}"
-                
+
                 // Update bio if exists
                 val bioTextView = findViewById<android.widget.TextView?>(R.id.bio)
                 bioTextView?.text = profile.bio ?: ""
-                
+
                 // Update full name if exists
                 val fullNameTextView = findViewById<android.widget.TextView?>(R.id.full_name)
                 fullNameTextView?.text = profile.fullName ?: profile.username
-                
+
                 // Update profile image using Picasso for caching
                 val profileImageView = findViewById<ImageView>(R.id.UserStoryView)
                 if (!profile.profilePicture.isNullOrEmpty()) {
-                    val imageUrl = com.hans.i221271_i220889.network.ApiConfig.BASE_URL + profile.profilePicture
+                    val imageUrl =
+                        com.hans.i221271_i220889.network.ApiConfig.BASE_URL + profile.profilePicture
                     Picasso.get()
                         .load(imageUrl)
                         .placeholder(R.drawable.ic_default_profile)
@@ -244,67 +253,74 @@ class OwnProfile : AppCompatActivity() {
                 } else {
                     profileImageView.setImageResource(R.drawable.ic_default_profile)
                 }
-                
+
                 // Update cover photo if exists
-                val coverImageView = findViewById<ImageView?>(R.id.cover_photo)
-                if (!profile.coverPhoto.isNullOrEmpty() && coverImageView != null) {
-                    val coverUrl = com.hans.i221271_i220889.network.ApiConfig.BASE_URL + profile.coverPhoto
-                    Picasso.get()
-                        .load(coverUrl)
-                        .into(coverImageView)
-                }
-                
+//                val coverImageView = findViewById<ImageView?>(R.id.cover_photo)
+//                if (!profile.coverPhoto.isNullOrEmpty() && coverImageView != null) {
+//                    val coverUrl = com.hans.i221271_i220889.network.ApiConfig.BASE_URL + profile.coverPhoto
+//                    Picasso.get()
+//                        .load(coverUrl)
+//                        .into(coverImageView)
+//                }
+
                 // Update stats from profile data
-                findViewById<android.widget.TextView>(R.id.Posts).text = "${profile.postsCount}\nposts"
-                findViewById<android.widget.TextView>(R.id.Followers).text = formatCount(profile.followersCount) + "\nfollowers"
-                findViewById<android.widget.TextView>(R.id.Following).text = "${profile.followingCount}\nfollowing"
-                
+                findViewById<android.widget.TextView>(R.id.Posts).text =
+                    "${profile.postsCount}\nposts"
+                findViewById<android.widget.TextView>(R.id.Followers).text =
+                    formatCount(profile.followersCount) + "\nfollowers"
+                findViewById<android.widget.TextView>(R.id.Following).text =
+                    "${profile.followingCount}\nfollowing"
+
             }.onFailure { error ->
-                Toast.makeText(this@OwnProfile, "Failed to load profile: ${error.message}", Toast.LENGTH_SHORT).show()
+                Toast.makeText(
+                    this@OwnProfile,
+                    "Failed to load profile: ${error.message}",
+                    Toast.LENGTH_SHORT
+                ).show()
             }
         }
     }
-    
+
     private fun setupMenuButton() {
         // Find menu/options button (usually three dots or similar)
-        val menuButton = findViewById<ImageButton?>(R.id.options_button) 
-            ?: findViewById<ImageButton?>(R.id.menu_button)
-            ?: findViewById<ImageButton?>(R.id.settings_button)
-        
-        menuButton?.setOnClickListener { view ->
-            val popup = PopupMenu(this, view)
-            popup.menuInflater.inflate(android.R.menu.submenu, popup.menu)
-            
-            // Add custom menu items
-            popup.menu.clear()
-            popup.menu.add(0, 1, 0, "Edit Profile")
-            popup.menu.add(0, 2, 0, "Settings")
-            popup.menu.add(0, 3, 0, "Logout")
-            
-            popup.setOnMenuItemClickListener { item ->
-                when (item.itemId) {
-                    1 -> {
-                        // Navigate to edit profile
-                        val intent = Intent(this, ProfilePictureUpdateActivity::class.java)
-                        startActivity(intent)
-                        true
-                    }
-                    2 -> {
-                        Toast.makeText(this, "Settings coming soon", Toast.LENGTH_SHORT).show()
-                        true
-                    }
-                    3 -> {
-                        // Logout
-                        AuthHelper.logout(this, showToast = true)
-                        true
-                    }
-                    else -> false
-                }
-            }
-            popup.show()
-        }
+//        val menuButton = findViewById<ImageButton?>(R.id.options_button)
+//            ?: findViewById<ImageButton?>(R.id.menu_button)
+//            ?: findViewById<ImageButton?>(R.id.settings_button)
+//
+//        menuButton?.setOnClickListener { view ->
+//            val popup = PopupMenu(this, view)
+//            popup.menuInflater.inflate(android.R.menu.submenu, popup.menu)
+//
+//            // Add custom menu items
+//            popup.menu.clear()
+//            popup.menu.add(0, 1, 0, "Edit Profile")
+//            popup.menu.add(0, 2, 0, "Settings")
+//            popup.menu.add(0, 3, 0, "Logout")
+//
+//            popup.setOnMenuItemClickListener { item ->
+//                when (item.itemId) {
+//                    1 -> {
+//                        // Navigate to edit profile
+//                        val intent = Intent(this, ProfilePictureUpdateActivity::class.java)
+//                        startActivity(intent)
+//                        true
+//                    }
+//                    2 -> {
+//                        Toast.makeText(this, "Settings Not Implemented", Toast.LENGTH_SHORT).show()
+//                        true
+//                    }
+//                    3 -> {
+//                        // Logout
+//                        AuthHelper.logout(this, showToast = true)
+//                        true
+//                    }
+//                    else -> false
+//                }
+//            }
+//            popup.show()
+//        }
     }
-    
+
     private fun formatCount(count: Int): String {
         return when {
             count >= 1000000 -> String.format("%.1fM", count / 1000000.0)

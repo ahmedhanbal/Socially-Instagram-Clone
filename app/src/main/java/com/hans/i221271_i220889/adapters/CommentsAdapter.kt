@@ -30,10 +30,15 @@ class CommentsAdapter(
         val comment = comments[position]
         
         holder.usernameText.text = comment.username
-        holder.commentText.text = comment.text
+        holder.commentText.text = comment.commentText.ifEmpty { comment.text }
         
-        val timeFormat = SimpleDateFormat("MMM dd, HH:mm", Locale.getDefault())
-        holder.timeText.text = timeFormat.format(Date(comment.timestamp))
+        try {
+            val timestamp = comment.timestamp.toLongOrNull() ?: System.currentTimeMillis()
+            val timeFormat = SimpleDateFormat("MMM dd, HH:mm", Locale.getDefault())
+            holder.timeText.text = timeFormat.format(Date(timestamp))
+        } catch (e: Exception) {
+            holder.timeText.text = comment.timestamp
+        }
     }
 
     override fun getItemCount(): Int = comments.size

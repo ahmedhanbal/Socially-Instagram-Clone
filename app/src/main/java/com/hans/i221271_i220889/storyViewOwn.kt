@@ -20,6 +20,7 @@ import com.hans.i221271_i220889.network.SessionManager
 import java.util.*
 
 class storyViewOwn : AppCompatActivity() {
+    private lateinit var sessionManager: SessionManager
     private lateinit var allStories: List<Story>
     private var currentStoryIndex = 0
     private var currentUserIndex = 0
@@ -43,17 +44,18 @@ class storyViewOwn : AppCompatActivity() {
             insets
         }
         
-        // Get story IDs from intent (to avoid Intent size limits with Base64 images)
+        // Initialize SessionManager
+        sessionManager = SessionManager(this)
+        
+        // Get story IDs from intent
         val initialStoryId = intent.getStringExtra("initialStoryId")
         val initialUserId = intent.getStringExtra("initialUserId")
-        val storyIds = intent.getStringArrayExtra("storyIds")
-        val userIds = intent.getStringArrayExtra("userIds")
         
-        android.util.Log.d("storyViewOwn", "Received initialStoryId: $initialStoryId, initialUserId: $initialUserId, storyIds size: ${storyIds?.size ?: 0}")
+        android.util.Log.d("storyViewOwn", "Received initialStoryId: $initialStoryId, initialUserId: $initialUserId")
         
         if (initialStoryId != null && initialUserId != null) {
-            // Load stories from Firebase using the IDs
-            loadStoriesFromFirebase(initialStoryId, initialUserId, storyIds, userIds)
+            // Load stories from cache
+            loadStoriesFromCache(initialStoryId, initialUserId)
         } else {
             android.util.Log.e("storyViewOwn", "No initialStoryId or initialUserId provided. Finishing activity.")
             finish()
@@ -86,7 +88,7 @@ class storyViewOwn : AppCompatActivity() {
         profileImageView?.setOnClickListener {
             val currentStory = getCurrentStory()
             if (currentStory != null) {
-                val currentUserId = FirebaseAuth.getInstance().currentUser?.uid
+                val currentUserId = sessionManager.getUserId().toString()
                 if (currentStory.userId == currentUserId) {
                     val intent = Intent(this, OwnProfile::class.java)
                     startActivity(intent)
@@ -178,31 +180,59 @@ class storyViewOwn : AppCompatActivity() {
     private fun displayCurrentStory() {
         val story = getCurrentStory()
         if (story != null) {
-            // Set story image
+            // Set story image (URL or Base64)
             if (story.imageUrl.isNotEmpty()) {
-                try {
-                    val bitmap = Base64Image.base64ToBitmap(story.imageUrl)
-                    storyImageView?.setImageBitmap(bitmap)
-                } catch (e: Exception) {
-                    storyImageView?.setImageResource(R.drawable.ic_default_profile)
+                if (story.imageUrl.startsWith("http") || story.imageUrl.startsWith("uploads/")) {
+                    // Load from URL using Picasso
+                    val imageUrl = if (story.imageUrl.startsWith("http")) {
+                        story.imageUrl
+                    } else {
+                        com.hans.i221271_i220889.network.ApiConfig.BASE_URL + story.imageUrl
+                    }
+                    com.squareup.picasso.Picasso.get()
+                        .load(imageUrl)
+                        .placeholder(R.drawable.ic_default_profile)
+                        .error(R.drawable.ic_default_profile)
+                        .into(storyImageView)
+                } else {
+                    // Fallback to Base64
+                    try {
+                        val bitmap = Base64Image.base64ToBitmap(story.imageUrl)
+                        storyImageView?.setImageBitmap(bitmap)
+                    } catch (e: Exception) {
+                        storyImageView?.setImageResource(R.drawable.ic_default_profile)
+                    }
                 }
             } else {
                 storyImageView?.setImageResource(R.drawable.ic_default_profile)
             }
             
-            // Set profile image
+            // Set profile image (URL or Base64)
             if (story.userProfileImage.isNotEmpty()) {
-                try {
-                    val bitmap = Base64Image.base64ToBitmap(story.userProfileImage)
-                    profileImageView?.setImageBitmap(bitmap)
-                } catch (e: Exception) {
-                    android.util.Log.e("storyViewOwn", "Error decoding profile image from story: ${e.message}", e)
-                    // Fallback: load from user's profile
-                    loadProfileImageFromUser(story.userId)
+                if (story.userProfileImage.startsWith("http") || story.userProfileImage.startsWith("uploads/")) {
+                    // Load from URL using Picasso
+                    val imageUrl = if (story.userProfileImage.startsWith("http")) {
+                        story.userProfileImage
+                    } else {
+                        com.hans.i221271_i220889.network.ApiConfig.BASE_URL + story.userProfileImage
+                    }
+                    com.squareup.picasso.Picasso.get()
+                        .load(imageUrl)
+                        .placeholder(R.drawable.ic_default_profile)
+                        .error(R.drawable.ic_default_profile)
+                        .into(profileImageView)
+                } else {
+                    // Fallback to Base64
+                    try {
+                        val bitmap = Base64Image.base64ToBitmap(story.userProfileImage)
+                        profileImageView?.setImageBitmap(bitmap)
+                    } catch (e: Exception) {
+                        android.util.Log.e("storyViewOwn", "Error decoding profile image from story: ${e.message}", e)
+                        profileImageView?.setImageResource(R.drawable.ic_default_profile)
+                    }
                 }
             } else {
-                // Fallback: load from user's profile
-                loadProfileImageFromUser(story.userId)
+                profileImageView?.setImageResource(R.drawable.ic_default_profile)
             }
             
             // Set username
@@ -278,65 +308,53 @@ class storyViewOwn : AppCompatActivity() {
     }
     
     private fun loadProfileImageFromUser(userId: String) {
-        FirebaseDatabase.getInstance().reference
-            .child("users")
-            .child(userId)
-            .child("profileImageBase64")
-            .addListenerForSingleValueEvent(object : com.google.firebase.database.ValueEventListener {
-                override fun onDataChange(snapshot: com.google.firebase.database.DataSnapshot) {
-                    val profileImageBase64 = snapshot.getValue(String::class.java) ?: ""
-                    if (profileImageBase64.isNotEmpty()) {
-                        try {
-                            val bitmap = Base64Image.base64ToBitmap(profileImageBase64)
-                            if (bitmap != null) {
-                                runOnUiThread {
-                                    profileImageView?.setImageBitmap(bitmap)
-                                }
-                            } else {
-                                runOnUiThread {
-                                    profileImageView?.setImageResource(R.drawable.ic_default_profile)
-                                }
-                            }
-                        } catch (e: Exception) {
-                            android.util.Log.e("storyViewOwn", "Error decoding profile image from user: ${e.message}", e)
-                            runOnUiThread {
-                                profileImageView?.setImageResource(R.drawable.ic_default_profile)
-                            }
-                        }
-                    } else {
-                        runOnUiThread {
-                            profileImageView?.setImageResource(R.drawable.ic_default_profile)
-                        }
-                    }
-                }
-                
-                override fun onCancelled(error: com.google.firebase.database.DatabaseError) {
-                    android.util.Log.e("storyViewOwn", "Failed to load profile image: ${error.message}")
-                    runOnUiThread {
-                        profileImageView?.setImageResource(R.drawable.ic_default_profile)
-                    }
-                }
-            })
+        // Profile image is already included in the Story object
+        // No need to fetch separately from backend
     }
     
     private fun markStoryAsViewed(story: Story) {
-        val currentUserId = FirebaseAuth.getInstance().currentUser?.uid
-        if (currentUserId != null && story.storyId.isNotEmpty()) {
-            FirebaseDatabase.getInstance().reference
-                .child("stories")
-                .child(story.storyId)
-                .child("viewers")
-                .child(currentUserId)
-                .setValue(true)
-        }
+        // Story views are tracked on the backend
+        // No client-side marking needed
     }
     
-    private fun loadStoriesFromFirebase(initialStoryId: String, initialUserId: String, storyIds: Array<String>?, userIds: Array<String>?) {
-        android.util.Log.d("storyViewOwn", "Loading stories from Firebase: initialStoryId=$initialStoryId, initialUserId=$initialUserId")
+    private fun loadStoriesFromCache(initialStoryId: String, initialUserId: String) {
+        android.util.Log.d("storyViewOwn", "Loading stories from cache")
         
         setupUI()
         
-        // If story IDs are provided, load those specific stories
+        // Get stories from cache
+        val cachedStories = com.hans.i221271_i220889.utils.StoryCache.getStories()
+        
+        if (cachedStories.isEmpty()) {
+            android.util.Log.e("storyViewOwn", "No stories in cache")
+            android.widget.Toast.makeText(this, "No stories available", android.widget.Toast.LENGTH_SHORT).show()
+            finish()
+            return
+        }
+        
+        allStories = cachedStories
+        
+        // Group stories by user and find initial position
+        val storiesByUser = groupStoriesByUser(allStories)
+        currentUserIndex = findUserIndex(storiesByUser, initialUserId)
+        
+        // Find initial story index within the user's stories
+        if (currentUserIndex < storiesByUser.keys.size) {
+            val uid = storiesByUser.keys.toList()[currentUserIndex]
+            val userStories = storiesByUser[uid] ?: emptyList()
+            currentStoryIndex = userStories.indexOfFirst { it.storyId == initialStoryId }
+            if (currentStoryIndex == -1) currentStoryIndex = 0
+        }
+        
+        setupGestureDetector()
+        displayCurrentStory()
+    }
+    
+    private fun loadStoriesFromFirebase(initialStoryId: String, initialUserId: String, storyIds: Array<String>?, userIds: Array<String>?) {
+        // Deprecated - now using loadStoriesFromCache
+        loadStoriesFromCache(initialStoryId, initialUserId)
+        
+        /* OLD FIREBASE CODE - REMOVED
         if (storyIds != null && storyIds.isNotEmpty() && userIds != null && userIds.size == storyIds.size) {
             val storyList = mutableListOf<Story>()
             var loadedCount = 0
@@ -345,7 +363,7 @@ class storyViewOwn : AppCompatActivity() {
                 val storyId = storyIds[i]
                 val userId = userIds[i]
                 
-                FirebaseDatabase.getInstance().reference
+                // FirebaseDatabase.getInstance().reference
                     .child("stories")
                     .child(storyId)
                     .addListenerForSingleValueEvent(object : com.google.firebase.database.ValueEventListener {
@@ -464,98 +482,14 @@ class storyViewOwn : AppCompatActivity() {
                     }
                 })
         }
+        */
     }
     
-    // Old method kept for backward compatibility (not used anymore)
-    @Deprecated("Use loadStoriesFromFirebase with story IDs instead")
+    // Old method - deprecated - not used with backend API
+    @Deprecated("Stories are now loaded from backend API")
     private fun loadStoriesFromFirebaseOld(userId: String) {
-        // This is a fallback if stories weren't passed via intent
-        // Load all stories from Firebase
-        val currentTime = System.currentTimeMillis()
-        val currentUserId = FirebaseAuth.getInstance().currentUser?.uid
-        
-        if (currentUserId == null) {
-            // If not logged in, just show the initial story
-            allStories = listOf(Story())
-            setupUI()
-            displayCurrentStory()
-            return
-        }
-        
-        // Get following list
-        FirebaseDatabase.getInstance().reference.child("following").child(currentUserId).get()
-            .addOnSuccessListener { followingSnapshot ->
-                val followingList = mutableListOf<String>()
-                followingList.add(currentUserId) // Include own stories
-                
-                for (userSnapshot in followingSnapshot.children) {
-                    val uid = userSnapshot.key
-                    if (uid != null) {
-                        followingList.add(uid)
-                    }
-                }
-                
-                // Load stories
-                FirebaseDatabase.getInstance().reference
-                    .child("stories")
-                    .orderByChild("expiresAt")
-                    .startAt(currentTime.toDouble())
-                    .addListenerForSingleValueEvent(object : com.google.firebase.database.ValueEventListener {
-                        override fun onDataChange(snapshot: com.google.firebase.database.DataSnapshot) {
-                            val storyList = mutableListOf<Story>()
-                            for (storySnapshot in snapshot.children) {
-                                try {
-                                    val storyData = storySnapshot.getValue(Map::class.java) as? Map<String, Any>
-                                    if (storyData != null) {
-                                        val storyUserId = storyData["userId"] as? String ?: ""
-                                        if (followingList.contains(storyUserId)) {
-                                            val story = Story(
-                                                storyId = storyData["storyId"] as? String ?: "",
-                                                userId = storyUserId,
-                                                username = storyData["username"] as? String ?: "User",
-                                                userProfileImage = storyData["userProfileImageBase64"] as? String ?: "",
-                                                imageUrl = storyData["imageBase64"] as? String ?: "",
-                                                videoUrl = storyData["videoBase64"] as? String ?: "",
-                                                timestamp = (storyData["timestamp"] as? Long) ?: System.currentTimeMillis(),
-                                                expiresAt = (storyData["expiresAt"] as? Long) ?: System.currentTimeMillis()
-                                            )
-                                            storyList.add(story)
-                                        }
-                                    }
-                                } catch (e: Exception) {
-                                    // Skip malformed story
-                                }
-                            }
-                            allStories = storyList
-                            
-                            // Group stories by user and find initial position
-                            val storiesByUser = groupStoriesByUser(allStories)
-                            currentUserIndex = findUserIndex(storiesByUser, userId)
-                            
-                            // Find initial story index within the user's stories
-                            if (currentUserIndex < storiesByUser.keys.size) {
-                                val uid = storiesByUser.keys.toList()[currentUserIndex]
-                                val userStories = storiesByUser[uid] ?: emptyList()
-                                currentStoryIndex = 0
-                            }
-                            
-                            setupUI()
-                            setupGestureDetector()
-                            displayCurrentStory()
-                        }
-                        
-                        override fun onCancelled(error: com.google.firebase.database.DatabaseError) {
-                            // Handle error
-                            allStories = listOf(Story())
-                            setupUI()
-                            displayCurrentStory()
-                        }
-                    })
-            }
-            .addOnFailureListener {
-                allStories = listOf(Story())
-                setupUI()
-                displayCurrentStory()
-            }
+        // No longer used - stories come from backend
+        android.widget.Toast.makeText(this, "Story viewing unavailable", android.widget.Toast.LENGTH_SHORT).show()
+        finish()
     }
 }

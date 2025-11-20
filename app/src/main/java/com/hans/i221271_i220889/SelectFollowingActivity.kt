@@ -13,6 +13,7 @@ import androidx.recyclerview.widget.RecyclerView
 import com.hans.i221271_i220889.adapters.UserAdapter
 import com.hans.i221271_i220889.models.User
 import com.hans.i221271_i220889.network.SessionManager
+import com.hans.i221271_i220889.repositories.FollowRepository
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.launch
 
@@ -24,6 +25,7 @@ class SelectFollowingActivity : AppCompatActivity() {
     private lateinit var usersRecyclerView: RecyclerView
     private lateinit var userAdapter: UserAdapter
     private lateinit var sessionManager: SessionManager
+    private lateinit var followRepository: FollowRepository
     private val followingUsers = mutableListOf<User>()
     
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -46,6 +48,7 @@ class SelectFollowingActivity : AppCompatActivity() {
         }
         
         sessionManager = SessionManager(this)
+        followRepository = FollowRepository(this)
         
         // Setup RecyclerView
         setupUsersRecyclerView()
@@ -78,29 +81,36 @@ class SelectFollowingActivity : AppCompatActivity() {
     }
     
     private fun loadFollowingUsers() {
-        // TODO: Implement following users API endpoint
-        // For now, show empty list
-        Toast.makeText(this, "Following list feature coming soon", Toast.LENGTH_SHORT).show()
-        
-        // Stub data for testing
-        followingUsers.clear()
-        userAdapter.notifyDataSetChanged()
-    }
-                                    Toast.makeText(this@SelectFollowingActivity, "No following users found", Toast.LENGTH_SHORT).show()
-                                }
-                            }
-                        }
-                    }
-                    
-                    override fun onCancelled(error: DatabaseError) {
-                        loadedCount++
-                        if (loadedCount == userIds.size) {
-                            runOnUiThread {
-                                userAdapter.notifyDataSetChanged()
-                            }
-                        }
-                    }
-                })
+        lifecycleScope.launch {
+            val userId = sessionManager.getUserId()
+            if (userId == -1) {
+                Toast.makeText(this@SelectFollowingActivity, "Not logged in", Toast.LENGTH_SHORT).show()
+                return@launch
+            }
+            
+            val result = followRepository.getFollowing(userId)
+            result.onSuccess { followDataList ->
+                followingUsers.clear()
+                followDataList.forEach { followData ->
+                    followingUsers.add(User(
+                        userId = followData.followingId.toString(),
+                        username = followData.username,
+                        fullName = followData.fullName ?: "",
+                        profilePicture = followData.profilePicture ?: "",
+                        bio = "",
+                        isPrivate = false, // FollowData doesn't include privacy info
+                        isFollowing = true,
+                        isFollowedBy = false
+                    ))
+                }
+                userAdapter.notifyDataSetChanged()
+                
+                if (followingUsers.isEmpty()) {
+                    Toast.makeText(this@SelectFollowingActivity, "No following users found", Toast.LENGTH_SHORT).show()
+                }
+            }.onFailure { exception ->
+                Toast.makeText(this@SelectFollowingActivity, "Failed to load following: ${exception.message}", Toast.LENGTH_SHORT).show()
+            }
         }
     }
 }

@@ -9,6 +9,8 @@ import androidx.recyclerview.widget.RecyclerView
 import com.hans.i221271_i220889.R
 import com.hans.i221271_i220889.models.Story
 import com.hans.i221271_i220889.utils.Base64Image
+import com.hans.i221271_i220889.network.ApiConfig
+import com.squareup.picasso.Picasso
 
 class StoryAdapter(
     private val stories: MutableList<Story>,
@@ -45,37 +47,68 @@ class StoryAdapter(
         // Set username
         holder.username.text = story.username
         
-        // Set story image from Base64
+        // Set story image (URL or Base64)
         if (story.imageUrl.isNotEmpty()) {
-            try {
-                val bitmap = Base64Image.base64ToBitmap(story.imageUrl)
-                if (bitmap != null) {
-                    holder.storyImage.setImageBitmap(bitmap)
-                    android.util.Log.d("StoryAdapter", "Story image set successfully for position $position")
+            if (story.imageUrl.startsWith("http") || story.imageUrl.startsWith("uploads/")) {
+                // Load from URL using Picasso
+                val imageUrl = if (story.imageUrl.startsWith("http")) {
+                    story.imageUrl
                 } else {
-                    android.util.Log.w("StoryAdapter", "Failed to decode Base64 image for position $position")
+                    ApiConfig.BASE_URL + story.imageUrl
+                }
+                Picasso.get()
+                    .load(imageUrl)
+                    .placeholder(R.drawable.ic_default_profile)
+                    .error(R.drawable.ic_default_profile)
+                    .into(holder.storyImage)
+                android.util.Log.d("StoryAdapter", "Story image loaded from URL for position $position")
+            } else {
+                // Fallback to Base64
+                try {
+                    val bitmap = Base64Image.base64ToBitmap(story.imageUrl)
+                    if (bitmap != null) {
+                        holder.storyImage.setImageBitmap(bitmap)
+                        android.util.Log.d("StoryAdapter", "Story image set successfully from Base64 for position $position")
+                    } else {
+                        android.util.Log.w("StoryAdapter", "Failed to decode Base64 image for position $position")
+                        holder.storyImage.setImageResource(R.drawable.ic_default_profile)
+                    }
+                } catch (e: Exception) {
+                    android.util.Log.e("StoryAdapter", "Error setting story image: ${e.message}", e)
                     holder.storyImage.setImageResource(R.drawable.ic_default_profile)
                 }
-            } catch (e: Exception) {
-                android.util.Log.e("StoryAdapter", "Error setting story image: ${e.message}", e)
-                holder.storyImage.setImageResource(R.drawable.ic_default_profile)
             }
         } else {
             android.util.Log.w("StoryAdapter", "Story imageUrl is empty for position $position")
             holder.storyImage.setImageResource(R.drawable.ic_default_profile)
         }
         
-        // Set profile image from Base64
+        // Set profile image (URL or Base64)
         if (story.userProfileImage.isNotEmpty()) {
-            try {
-                val bitmap = Base64Image.base64ToBitmap(story.userProfileImage)
-                if (bitmap != null) {
-                    holder.profileImage.setImageBitmap(bitmap)
+            if (story.userProfileImage.startsWith("http") || story.userProfileImage.startsWith("uploads/")) {
+                // Load from URL using Picasso
+                val imageUrl = if (story.userProfileImage.startsWith("http")) {
+                    story.userProfileImage
                 } else {
+                    ApiConfig.BASE_URL + story.userProfileImage
+                }
+                Picasso.get()
+                    .load(imageUrl)
+                    .placeholder(R.drawable.ic_default_profile)
+                    .error(R.drawable.ic_default_profile)
+                    .into(holder.profileImage)
+            } else {
+                // Fallback to Base64
+                try {
+                    val bitmap = Base64Image.base64ToBitmap(story.userProfileImage)
+                    if (bitmap != null) {
+                        holder.profileImage.setImageBitmap(bitmap)
+                    } else {
+                        holder.profileImage.setImageResource(R.drawable.ic_default_profile)
+                    }
+                } catch (e: Exception) {
                     holder.profileImage.setImageResource(R.drawable.ic_default_profile)
                 }
-            } catch (e: Exception) {
-                holder.profileImage.setImageResource(R.drawable.ic_default_profile)
             }
         } else {
             holder.profileImage.setImageResource(R.drawable.ic_default_profile)

@@ -141,7 +141,7 @@ class UserProfile : AppCompatActivity() {
                 lifecycleScope.launch {
                     if (isFollowing) {
                         // Unfollow
-                        val result = followRepository.unfollowUser(targetUserIdInt)
+                        val result = followRepository.unfollow(targetUserIdInt)
                         result.onSuccess {
                             isFollowing = false
                             updateFollowButton()
@@ -151,15 +151,15 @@ class UserProfile : AppCompatActivity() {
                             Toast.makeText(this@UserProfile, "Failed to unfollow: ${error.message}", Toast.LENGTH_SHORT).show()
                         }
                     } else {
-                        // Follow
-                        val result = followRepository.followUser(targetUserIdInt)
+                        // Send follow request
+                        val result = followRepository.sendFollowRequest(targetUserIdInt)
                         result.onSuccess {
                             isFollowing = true
                             updateFollowButton()
                             loadUserStats() // Refresh stats
-                            Toast.makeText(this@UserProfile, "Followed successfully", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(this@UserProfile, "Follow request sent", Toast.LENGTH_SHORT).show()
                         }.onFailure { error ->
-                            Toast.makeText(this@UserProfile, "Failed to follow: ${error.message}", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(this@UserProfile, "Failed to send request: ${error.message}", Toast.LENGTH_SHORT).show()
                         }
                     }
                 }
@@ -185,10 +185,13 @@ class UserProfile : AppCompatActivity() {
     private fun checkFollowStatus() {
         if (currentUserId != null && targetUserId != null) {
             val targetUserIdInt = targetUserId!!.toIntOrNull() ?: return
+            val currentUserIdInt = currentUserId!!.toIntOrNull() ?: return
+            
             lifecycleScope.launch {
-                val result = followRepository.checkFollowStatus(targetUserIdInt)
-                result.onSuccess { status ->
-                    isFollowing = status.isFollowing
+                // Check if current user is following the target user
+                val result = followRepository.getFollowing(currentUserIdInt)
+                result.onSuccess { followingList ->
+                    isFollowing = followingList.any { it.followingId == targetUserIdInt }
                     updateFollowButton()
                 }
             }
@@ -218,35 +221,34 @@ class UserProfile : AppCompatActivity() {
         if (targetUserId == null) return
         
         lifecycleScope.launch {
-            val result = profileRepository.getUserProfile(targetUserId!!.toIntOrNull() ?: return@launch)
+            val result = profileRepository.getProfile(targetUserId!!.toIntOrNull() ?: return@launch)
             result.onSuccess { userData ->
                 // Update username
                 findViewById<TextView>(R.id.header_title).text = userData.username
                 findViewById<TextView>(R.id.header_title_2).text = userData.username
                 findViewById<TextView>(R.id.header_title_3).text = "@${userData.username}"
                 
-                // Update profile image
+                // Update profile image using Picasso
                 val profileImageView = findViewById<ImageView>(R.id.UserStoryView)
                 val profilePic = userData.profilePicture
                 if (!profilePic.isNullOrEmpty()) {
-                    val bitmap = Base64Image.base64ToBitmap(profilePic)
-                    if (bitmap != null) {
-                        profileImageView.setImageBitmap(bitmap)
-                    } else {
-                        profileImageView.setImageResource(R.drawable.ic_default_profile)
-                    }
+                    val imageUrl = com.hans.i221271_i220889.network.ApiConfig.BASE_URL + profilePic
+                    com.squareup.picasso.Picasso.get()
+                        .load(imageUrl)
+                        .placeholder(R.drawable.ic_default_profile)
+                        .error(R.drawable.ic_default_profile)
+                        .into(profileImageView)
                 } else {
                     profileImageView.setImageResource(R.drawable.ic_default_profile)
-                    }
-                    
-                    // Bio field not in User model, leave empty
-                    val bioTextView = findViewById<TextView>(R.id.paragraphText)
-                    bioTextView.text = ""
                 }
+                
+                // Update bio
+                val bioTextView = findViewById<TextView>(R.id.paragraphText)
+                bioTextView.text = userData.bio ?: ""
+            }.onFailure { error ->
+                Toast.makeText(this@UserProfile, "Failed to load user profile: ${error.message}", Toast.LENGTH_SHORT).show()
             }
-            .addOnFailureListener {
-                Toast.makeText(this, "Failed to load user profile", Toast.LENGTH_SHORT).show()
-            }
+        }
     }
     
     private fun loadUserPosts() {
@@ -285,7 +287,7 @@ class UserProfile : AppCompatActivity() {
         if (targetUserId == null) return
         
         lifecycleScope.launch {
-            val result = profileRepository.getUserProfile(targetUserId!!.toIntOrNull() ?: return@launch)
+            val result = profileRepository.getProfile(targetUserId!!.toIntOrNull() ?: return@launch)
             result.onSuccess { userData ->
                 // Update followers count
                 val followersTextView = findViewById<TextView>(R.id.Followers)

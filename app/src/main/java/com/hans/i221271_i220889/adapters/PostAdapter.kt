@@ -11,6 +11,8 @@ import com.hans.i221271_i220889.models.Post
 import com.hans.i221271_i220889.utils.Base64Image
 import com.hans.i221271_i220889.repositories.PostRepositoryApi
 import com.hans.i221271_i220889.network.SessionManager
+import com.hans.i221271_i220889.network.ApiConfig
+import com.squareup.picasso.Picasso
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 
@@ -46,10 +48,32 @@ class PostAdapter(
         val post = posts[position]
         val currentUserId = sessionManager.getUserId().toString()
 
-        // Set profile image (Base64 encoded)
+        // Set profile image (URL or Base64)
         if (post.userProfileImage.isNotEmpty()) {
+            if (post.userProfileImage.startsWith("http") || post.userProfileImage.startsWith("uploads/")) {
+                // Load from URL using Picasso
+                val imageUrl = if (post.userProfileImage.startsWith("http")) {
+                    post.userProfileImage
+                } else {
+                    ApiConfig.BASE_URL + post.userProfileImage
+                }
+                Picasso.get()
+                    .load(imageUrl)
+                    .placeholder(R.drawable.ic_default_profile)
+                    .error(R.drawable.ic_default_profile)
+                    .into(holder.profileImage)
+            } else {
+                // Fallback to Base64
+                try {
+                    val bitmap = Base64Image.base64ToBitmap(post.userProfileImage)
+                    holder.profileImage.setImageBitmap(bitmap)
+                } catch (e: Exception) {
+                    holder.profileImage.setImageResource(R.drawable.ic_default_profile)
+                }
+            }
+        } else if (post.userProfileImageBase64.isNotEmpty()) {
             try {
-                val bitmap = Base64Image.base64ToBitmap(post.userProfileImage)
+                val bitmap = Base64Image.base64ToBitmap(post.userProfileImageBase64)
                 holder.profileImage.setImageBitmap(bitmap)
             } catch (e: Exception) {
                 holder.profileImage.setImageResource(R.drawable.ic_default_profile)
@@ -62,10 +86,32 @@ class PostAdapter(
         holder.username.text = post.username
         holder.location.text = "Tokyo, Japan" // You can add location to Post model
 
-        // Set post image (Base64)
+        // Set post image (URL or Base64)
         if (post.imageUrl.isNotEmpty()) {
+            if (post.imageUrl.startsWith("http") || post.imageUrl.startsWith("uploads/")) {
+                // Load from URL using Picasso
+                val imageUrl = if (post.imageUrl.startsWith("http")) {
+                    post.imageUrl
+                } else {
+                    ApiConfig.BASE_URL + post.imageUrl
+                }
+                Picasso.get()
+                    .load(imageUrl)
+                    .placeholder(R.drawable.placeholder_image)
+                    .error(R.drawable.placeholder_image)
+                    .into(holder.postImage)
+            } else {
+                // Fallback to Base64
+                try {
+                    val bitmap = Base64Image.base64ToBitmap(post.imageUrl)
+                    holder.postImage.setImageBitmap(bitmap)
+                } catch (e: Exception) {
+                    holder.postImage.setImageResource(R.drawable.placeholder_image)
+                }
+            }
+        } else if (post.imageBase64.isNotEmpty()) {
             try {
-                val bitmap = Base64Image.base64ToBitmap(post.imageUrl)
+                val bitmap = Base64Image.base64ToBitmap(post.imageBase64)
                 holder.postImage.setImageBitmap(bitmap)
             } catch (e: Exception) {
                 holder.postImage.setImageResource(R.drawable.placeholder_image)
@@ -127,21 +173,32 @@ class PostAdapter(
             val postId = post.postId.toIntOrNull() ?: return@setOnClickListener
             
             lifecycleScope.launch {
-                val result = if (isLiked) {
-                    postRepository.unlikePost(postId)
-                } else {
-                    postRepository.likePost(postId)
-                }
+                val result = postRepository.toggleLike(postId)
                 
-                result.onSuccess {
-                    // Update UI optimistically
-                    post.isLikedByCurrentUser = !isLiked
-                    post.likesCount = if (isLiked) post.likesCount - 1 else post.likesCount + 1
+                result.onSuccess { newLikeStatus ->
+                    // Update UI based on new like status
+                    val newIsLiked = newLikeStatus
+                    val newLikesCount = if (newIsLiked && !isLiked) {
+                        post.likesCount + 1
+                    } else if (!newIsLiked && isLiked) {
+                        post.likesCount - 1
+                    } else {
+                        post.likesCount
+                    }
                     
                     holder.likeButton.setImageResource(
-                        if (post.isLikedByCurrentUser) R.drawable.like_filled else R.drawable.like
+                        if (newIsLiked) R.drawable.like_filled else R.drawable.like
                     )
-                    holder.likeCount.text = "${post.likesCount} likes"
+                    holder.likeCount.text = "$newLikesCount likes"
+                    
+                    // Update the post in the list
+                    val index = posts.indexOf(post)
+                    if (index != -1) {
+                        posts[index] = post.copy(
+                            isLikedByCurrentUser = newIsLiked,
+                            likesCount = newLikesCount
+                        )
+                    }
                 }.onFailure { error ->
                     Toast.makeText(holder.itemView.context, "Failed to update like: ${error.message}", Toast.LENGTH_SHORT).show()
                 }

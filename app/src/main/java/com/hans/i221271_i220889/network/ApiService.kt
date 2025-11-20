@@ -9,20 +9,13 @@ interface ApiService {
     
     // ==================== AUTH ====================
     @POST("routes/auth/signup.php")
-    @FormUrlEncoded
     suspend fun signup(
-        @Field("username") username: String,
-        @Field("email") email: String,
-        @Field("password") password: String,
-        @Field("full_name") fullName: String?
+        @Body body: SignupRequest
     ): Response<ApiResponse<AuthData>>
     
     @POST("routes/auth/login.php")
-    @FormUrlEncoded
     suspend fun login(
-        @Field("username") username: String,
-        @Field("password") password: String,
-        @Field("fcm_token") fcmToken: String?
+        @Body body: LoginRequest
     ): Response<ApiResponse<AuthData>>
     
     @POST("routes/auth/logout.php")

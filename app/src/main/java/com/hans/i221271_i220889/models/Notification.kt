@@ -7,13 +7,14 @@ data class Notification(
     val type: String = "", // "call", "message", "follow_request", "like"
     val fromUserId: String = "",
     val fromUsername: String = "",
-    val fromUserProfileImage: String = "",
+    val profilePicture: String = "", // Profile picture URL from backend
     val title: String = "",
-    val body: String = "",
-    val timestamp: Long = System.currentTimeMillis(),
+    val message: String = "", // Message text
+    val body: String = "", // Backward compatibility
+    val timestamp: String = System.currentTimeMillis().toString(),
     val postId: String = "", // For like notifications
     val channelName: String = "", // For call notifications
     val callType: String = "", // "voice" or "video" for call notifications
-    val isRead: Boolean = false
+    var isRead: Boolean = false
 ) : Serializable
 

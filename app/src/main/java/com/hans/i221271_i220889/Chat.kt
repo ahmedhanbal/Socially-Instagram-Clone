@@ -261,7 +261,8 @@ class Chat : AppCompatActivity() {
             }
             
             android.util.Log.d("Chat", "setupMessagesRecyclerView: Creating MessageAdapter")
-            messageAdapter = MessageAdapter(messages) { message ->
+            val currentUserId = sessionManager.getUserId().toString()
+            messageAdapter = MessageAdapter(messages, currentUserId) { message ->
                 showMessageOptionsDialog(message)
             }
             android.util.Log.d("Chat", "setupMessagesRecyclerView: MessageAdapter created")

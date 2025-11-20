@@ -29,13 +29,45 @@ class SessionManager(context: Context) {
     fun saveSession(authData: AuthData) {
         prefs.edit().apply {
             putString(KEY_TOKEN, authData.token)
-            putInt(KEY_USER_ID, authData.userId)
-            putString(KEY_USERNAME, authData.username)
-            putString(KEY_EMAIL, authData.email)
-            putString(KEY_FULL_NAME, authData.fullName)
-            putString(KEY_PROFILE_PICTURE, authData.profilePicture)
+            putInt(KEY_USER_ID, authData.user.id)
+            putString(KEY_USERNAME, authData.user.username)
+            putString(KEY_EMAIL, authData.user.email)
+            putString(KEY_FULL_NAME, authData.user.fullName)
+            putString(KEY_PROFILE_PICTURE, authData.user.profilePicture)
             putBoolean(KEY_IS_LOGGED_IN, true)
             putBoolean(KEY_IS_FIRST_TIME, false)
+            apply()
+        }
+    }
+    
+    /**
+     * Save auth token
+     */
+    fun saveAuthToken(token: String) {
+        prefs.edit().putString(KEY_TOKEN, token).apply()
+    }
+    
+    /**
+     * Save user ID
+     */
+    fun saveUserId(userId: Int) {
+        prefs.edit().putInt(KEY_USER_ID, userId).apply()
+    }
+    
+    /**
+     * Save username
+     */
+    fun saveUsername(username: String) {
+        prefs.edit().putString(KEY_USERNAME, username).apply()
+    }
+    
+    /**
+     * Save profile picture
+     */
+    fun saveProfilePicture(profilePicture: String) {
+        prefs.edit().apply {
+            putString(KEY_PROFILE_PICTURE, profilePicture)
+            putBoolean(KEY_IS_LOGGED_IN, true)
             apply()
         }
     }
