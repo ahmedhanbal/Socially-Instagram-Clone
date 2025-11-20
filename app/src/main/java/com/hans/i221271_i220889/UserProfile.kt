@@ -15,14 +15,18 @@ import androidx.recyclerview.widget.RecyclerView
 import com.hans.i221271_i220889.adapters.PostAdapter
 import com.hans.i221271_i220889.models.Post
 import com.hans.i221271_i220889.utils.Base64Image
-import com.hans.i221271_i220889.utils.FollowManager
-import com.hans.i221271_i220889.utils.PostRepository
-import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.database.FirebaseDatabase
+import com.hans.i221271_i220889.repositories.ProfileRepository
+import com.hans.i221271_i220889.repositories.PostRepositoryApi
+import com.hans.i221271_i220889.repositories.FollowRepository
+import com.hans.i221271_i220889.network.SessionManager
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.launch
 
 class UserProfile : AppCompatActivity() {
-    private lateinit var postRepository: PostRepository
-    private lateinit var followManager: FollowManager
+    private lateinit var profileRepository: ProfileRepository
+    private lateinit var postRepository: PostRepositoryApi
+    private lateinit var followRepository: FollowRepository
+    private lateinit var sessionManager: SessionManager
     private lateinit var postsRecyclerView: RecyclerView
     private lateinit var postAdapter: PostAdapter
     private val posts = mutableListOf<Post>()
@@ -41,9 +45,15 @@ class UserProfile : AppCompatActivity() {
             insets
         }
 
+        // Initialize repositories and session
+        sessionManager = SessionManager(this)
+        profileRepository = ProfileRepository(this)
+        postRepository = PostRepositoryApi(this)
+        followRepository = FollowRepository(this)
+        
         // Get user IDs
         targetUserId = intent.getStringExtra("userId")
-        currentUserId = FirebaseAuth.getInstance().currentUser?.uid
+        currentUserId = sessionManager.getSession()?.userId?.toString()
         
         // If viewing own profile, redirect to OwnProfile
         if (targetUserId == null || targetUserId == currentUserId) {
@@ -52,10 +62,6 @@ class UserProfile : AppCompatActivity() {
             finish()
             return
         }
-
-        // Initialize repositories
-        postRepository = PostRepository()
-        followManager = FollowManager()
         
         // Setup UI
         setupPostsRecyclerView()
@@ -126,23 +132,34 @@ class UserProfile : AppCompatActivity() {
         
         followButton.setOnClickListener {
             if (currentUserId != null && targetUserId != null) {
-                if (isFollowing) {
-                    // Unfollow
-                    followManager.unfollowUser(currentUserId!!, targetUserId!!, this) { success, _ ->
-                        if (success) {
+                val targetUserIdInt = targetUserId!!.toIntOrNull()
+                if (targetUserIdInt == null) {
+                    Toast.makeText(this, "Invalid user ID", Toast.LENGTH_SHORT).show()
+                    return@setOnClickListener
+                }
+                
+                lifecycleScope.launch {
+                    if (isFollowing) {
+                        // Unfollow
+                        val result = followRepository.unfollowUser(targetUserIdInt)
+                        result.onSuccess {
                             isFollowing = false
                             updateFollowButton()
                             loadUserStats() // Refresh stats
+                            Toast.makeText(this@UserProfile, "Unfollowed successfully", Toast.LENGTH_SHORT).show()
+                        }.onFailure { error ->
+                            Toast.makeText(this@UserProfile, "Failed to unfollow: ${error.message}", Toast.LENGTH_SHORT).show()
                         }
-                    }
-                } else {
-                    // Send follow request
-                    followManager.sendFollowRequest(currentUserId!!, targetUserId!!, this) { success, _ ->
-                        if (success) {
-                            hasPendingRequest = true
+                    } else {
+                        // Follow
+                        val result = followRepository.followUser(targetUserIdInt)
+                        result.onSuccess {
+                            isFollowing = true
                             updateFollowButton()
-                            // Check if request was auto-accepted (if user accepts immediately)
-                            checkFollowStatus()
+                            loadUserStats() // Refresh stats
+                            Toast.makeText(this@UserProfile, "Followed successfully", Toast.LENGTH_SHORT).show()
+                        }.onFailure { error ->
+                            Toast.makeText(this@UserProfile, "Failed to follow: ${error.message}", Toast.LENGTH_SHORT).show()
                         }
                     }
                 }
@@ -167,9 +184,11 @@ class UserProfile : AppCompatActivity() {
     
     private fun checkFollowStatus() {
         if (currentUserId != null && targetUserId != null) {
-            followManager.isFollowing(currentUserId!!, targetUserId!!) { following ->
-                isFollowing = following
-                runOnUiThread {
+            val targetUserIdInt = targetUserId!!.toIntOrNull() ?: return
+            lifecycleScope.launch {
+                val result = followRepository.checkFollowStatus(targetUserIdInt)
+                result.onSuccess { status ->
+                    isFollowing = status.isFollowing
                     updateFollowButton()
                 }
             }
@@ -177,21 +196,8 @@ class UserProfile : AppCompatActivity() {
     }
     
     private fun checkPendingRequest() {
-        if (currentUserId != null && targetUserId != null) {
-            FirebaseDatabase.getInstance().reference
-                .child("followRequests")
-                .child(targetUserId!!)
-                .child(currentUserId!!)
-                .addListenerForSingleValueEvent(object : com.google.firebase.database.ValueEventListener {
-                    override fun onDataChange(snapshot: com.google.firebase.database.DataSnapshot) {
-                        hasPendingRequest = snapshot.exists()
-                        runOnUiThread {
-                            updateFollowButton()
-                        }
-                    }
-                    override fun onCancelled(error: com.google.firebase.database.DatabaseError) {}
-                })
-        }
+        // No longer needed - follow status is handled by checkFollowStatus
+        hasPendingRequest = false
     }
     
     private fun updateFollowButton() {
@@ -211,34 +217,26 @@ class UserProfile : AppCompatActivity() {
     private fun loadUserProfile() {
         if (targetUserId == null) return
         
-        FirebaseDatabase.getInstance().reference
-            .child("users")
-            .child(targetUserId!!)
-            .get()
-            .addOnSuccessListener { snapshot ->
-                val user = snapshot.getValue(com.hans.i221271_i220889.models.User::class.java)
-                if (user != null) {
-                    // Update username
-                    val usernameTextView = findViewById<TextView>(R.id.header_title)
-                    usernameTextView.text = user.username
-                    
-                    val usernameTextView2 = findViewById<TextView>(R.id.header_title_2)
-                    usernameTextView2.text = user.username
-                    
-                    val usernameTextView3 = findViewById<TextView>(R.id.header_title_3)
-                    usernameTextView3.text = "@${user.username}"
-                    
-                    // Update profile image
-                    val profileImageView = findViewById<ImageView>(R.id.UserStoryView)
-                    if (user.profileImageBase64.isNotEmpty()) {
-                        val bitmap = Base64Image.base64ToBitmap(user.profileImageBase64)
-                        if (bitmap != null) {
-                            profileImageView.setImageBitmap(bitmap)
-                        } else {
-                            profileImageView.setImageResource(R.drawable.ic_default_profile)
-                        }
+        lifecycleScope.launch {
+            val result = profileRepository.getUserProfile(targetUserId!!.toIntOrNull() ?: return@launch)
+            result.onSuccess { userData ->
+                // Update username
+                findViewById<TextView>(R.id.header_title).text = userData.username
+                findViewById<TextView>(R.id.header_title_2).text = userData.username
+                findViewById<TextView>(R.id.header_title_3).text = "@${userData.username}"
+                
+                // Update profile image
+                val profileImageView = findViewById<ImageView>(R.id.UserStoryView)
+                val profilePic = userData.profilePicture
+                if (!profilePic.isNullOrEmpty()) {
+                    val bitmap = Base64Image.base64ToBitmap(profilePic)
+                    if (bitmap != null) {
+                        profileImageView.setImageBitmap(bitmap)
                     } else {
                         profileImageView.setImageResource(R.drawable.ic_default_profile)
+                    }
+                } else {
+                    profileImageView.setImageResource(R.drawable.ic_default_profile)
                     }
                     
                     // Bio field not in User model, leave empty
@@ -254,15 +252,31 @@ class UserProfile : AppCompatActivity() {
     private fun loadUserPosts() {
         if (targetUserId == null) return
         
-        postRepository.getUserPosts(targetUserId!!) { userPosts ->
-            runOnUiThread {
+        lifecycleScope.launch {
+            val result = postRepository.getUserPosts(targetUserId!!.toIntOrNull() ?: return@launch)
+            result.onSuccess { postDataList ->
                 posts.clear()
-                posts.addAll(userPosts)
+                postDataList.forEach { postData ->
+                    posts.add(Post(
+                        postId = postData.id.toString(),
+                        userId = postData.userId.toString(),
+                        username = postData.username,
+                        userProfileImageBase64 = postData.profilePicture ?: "",
+                        caption = postData.caption ?: "",
+                        imageBase64 = postData.mediaUrl ?: "",
+                        videoBase64 = if (postData.mediaType == "video") postData.mediaUrl ?: "" else "",
+                        timestamp = System.currentTimeMillis(),
+                        likesCount = postData.likesCount,
+                        commentsCount = postData.commentsCount,
+                        isLikedByCurrentUser = postData.isLiked
+                    ))
+                }
                 postAdapter.notifyDataSetChanged()
                 
                 // Update posts count
-                val postsTextView = findViewById<TextView>(R.id.Posts)
-                postsTextView.text = "${userPosts.size}\nposts"
+                findViewById<TextView>(R.id.Posts).text = "${postDataList.size}\nposts"
+            }.onFailure { error ->
+                Toast.makeText(this@UserProfile, "Failed to load posts: ${error.message}", Toast.LENGTH_SHORT).show()
             }
         }
     }
@@ -270,49 +284,34 @@ class UserProfile : AppCompatActivity() {
     private fun loadUserStats() {
         if (targetUserId == null) return
         
-        val db = FirebaseDatabase.getInstance().reference
-        
-        // Load followers count
-        db.child("followers").child(targetUserId!!).addListenerForSingleValueEvent(
-            object : com.google.firebase.database.ValueEventListener {
-                override fun onDataChange(snapshot: com.google.firebase.database.DataSnapshot) {
-                    val followersCount = snapshot.children.count()
-                    val followersTextView = findViewById<TextView>(R.id.Followers)
-                    followersTextView.text = formatCount(followersCount) + "\nfollowers"
-                    
-                    // Make followers clickable
-                    followersTextView.setOnClickListener {
-                        val intent = Intent(this@UserProfile, FollowersFollowingActivity::class.java)
-                        intent.putExtra("mode", "followers")
-                        intent.putExtra("userId", targetUserId)
-                        startActivity(intent)
-                    }
-                    followersTextView.isClickable = true
+        lifecycleScope.launch {
+            val result = profileRepository.getUserProfile(targetUserId!!.toIntOrNull() ?: return@launch)
+            result.onSuccess { userData ->
+                // Update followers count
+                val followersTextView = findViewById<TextView>(R.id.Followers)
+                followersTextView.text = formatCount(userData.followersCount) + "\nfollowers"
+                followersTextView.setOnClickListener {
+                    val intent = Intent(this@UserProfile, FollowersFollowingActivity::class.java)
+                    intent.putExtra("mode", "followers")
+                    intent.putExtra("userId", targetUserId)
+                    startActivity(intent)
                 }
-                override fun onCancelled(error: com.google.firebase.database.DatabaseError) {}
-            }
-        )
-        
-        // Load following count
-        db.child("following").child(targetUserId!!).addListenerForSingleValueEvent(
-            object : com.google.firebase.database.ValueEventListener {
-                override fun onDataChange(snapshot: com.google.firebase.database.DataSnapshot) {
-                    val followingCount = snapshot.children.count()
-                    val followingTextView = findViewById<TextView>(R.id.Following)
-                    followingTextView.text = "$followingCount\nfollowing"
-                    
-                    // Make following clickable
-                    followingTextView.setOnClickListener {
-                        val intent = Intent(this@UserProfile, FollowersFollowingActivity::class.java)
-                        intent.putExtra("mode", "following")
-                        intent.putExtra("userId", targetUserId)
-                        startActivity(intent)
-                    }
-                    followingTextView.isClickable = true
+                followersTextView.isClickable = true
+                
+                // Update following count
+                val followingTextView = findViewById<TextView>(R.id.Following)
+                followingTextView.text = "${userData.followingCount}\nfollowing"
+                followingTextView.setOnClickListener {
+                    val intent = Intent(this@UserProfile, FollowersFollowingActivity::class.java)
+                    intent.putExtra("mode", "following")
+                    intent.putExtra("userId", targetUserId)
+                    startActivity(intent)
                 }
-                override fun onCancelled(error: com.google.firebase.database.DatabaseError) {}
+                followingTextView.isClickable = true
+            }.onFailure { error ->
+                Toast.makeText(this@UserProfile, "Failed to load stats: ${error.message}", Toast.LENGTH_SHORT).show()
             }
-        )
+        }
         
         // Make posts clickable
         val postsTextView = findViewById<TextView>(R.id.Posts)
