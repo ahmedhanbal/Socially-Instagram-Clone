@@ -11,14 +11,19 @@ import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
-import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.database.FirebaseDatabase
 import com.hans.i221271_i220889.utils.AgoraCallManager
 import com.hans.i221271_i220889.utils.Base64Image
+import com.hans.i221271_i220889.repositories.ProfileRepository
+import com.hans.i221271_i220889.network.SessionManager
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.launch
 import android.view.SurfaceView
 import android.widget.FrameLayout
 
 class CallActivity : AppCompatActivity() {
+    
+    private lateinit var profileRepository: ProfileRepository
+    private lateinit var sessionManager: SessionManager
     
     private lateinit var localVideoView: FrameLayout
     private lateinit var remoteVideoView: FrameLayout
@@ -45,6 +50,10 @@ class CallActivity : AppCompatActivity() {
             v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom)
             insets
         }
+        
+        // Initialize repositories
+        sessionManager = SessionManager(this)
+        profileRepository = ProfileRepository(this)
         
         // Get intent extras
         channelName = intent.getStringExtra("channelName") ?: "default_channel"
@@ -221,9 +230,9 @@ class CallActivity : AppCompatActivity() {
     }
     
     private fun joinChannel() {
-        val currentUserId = FirebaseAuth.getInstance().currentUser?.uid ?: return
-        // Use a hash of user ID as UID (Agora requires Int UID)
-        val uid = currentUserId.hashCode() and 0x7FFFFFFF // Ensure positive
+        val currentUserId = sessionManager.getUserId()
+        // Use user ID as UID (Agora requires Int UID)
+        val uid = currentUserId
         
         callStatusText.text = "Joining channel..."
         callManager.joinChannel(channelName, uid)
@@ -259,33 +268,42 @@ class CallActivity : AppCompatActivity() {
     }
     
     private fun loadProfileImage() {
-        val userId = otherUserId ?: return
+        val userId = otherUserId?.toIntOrNull() ?: return
         
-        FirebaseDatabase.getInstance().reference
-            .child("users")
-            .child(userId)
-            .child("profileImageBase64")
-            .addListenerForSingleValueEvent(object : com.google.firebase.database.ValueEventListener {
-                override fun onDataChange(snapshot: com.google.firebase.database.DataSnapshot) {
-                    val profileImageBase64 = snapshot.getValue(String::class.java) ?: ""
-                    if (profileImageBase64.isNotEmpty()) {
-                        try {
-                            val bitmap = Base64Image.base64ToBitmap(profileImageBase64)
-                            if (bitmap != null) {
-                                runOnUiThread {
-                                    profileImageView.setImageBitmap(bitmap)
-                                }
+        lifecycleScope.launch {
+            try {
+                val result = profileRepository.getUserProfile(userId)
+                result.onSuccess { userData ->
+                    val profilePic = userData.profilePicture
+                    if (!profilePic.isNullOrEmpty()) {
+                        val bitmap = Base64Image.base64ToBitmap(profilePic)
+                        if (bitmap != null) {
+                            runOnUiThread {
+                                profileImageView.setImageBitmap(bitmap)
                             }
-                        } catch (e: Exception) {
-                            android.util.Log.e("CallActivity", "Error loading profile image: ${e.message}", e)
+                        } else {
+                            runOnUiThread {
+                                profileImageView.setImageResource(R.drawable.ic_default_profile)
+                            }
+                        }
+                    } else {
+                        runOnUiThread {
+                            profileImageView.setImageResource(R.drawable.ic_default_profile)
                         }
                     }
+                }.onFailure { error ->
+                    android.util.Log.e("CallActivity", "Error loading profile image: ${error.message}")
+                    runOnUiThread {
+                        profileImageView.setImageResource(R.drawable.ic_default_profile)
+                    }
                 }
-                
-                override fun onCancelled(error: com.google.firebase.database.DatabaseError) {
-                    android.util.Log.e("CallActivity", "Failed to load profile image: ${error.message}")
+            } catch (e: Exception) {
+                android.util.Log.e("CallActivity", "Error loading profile image: ${e.message}", e)
+                runOnUiThread {
+                    profileImageView.setImageResource(R.drawable.ic_default_profile)
                 }
-            })
+            }
+        }
     }
     
     private fun endCall() {

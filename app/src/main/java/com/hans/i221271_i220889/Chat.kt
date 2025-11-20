@@ -314,15 +314,11 @@ class Chat : AppCompatActivity() {
                 messageDataList.forEach { msgData ->
                     messages.add(ChatMessage(
                         messageId = msgData.id.toString(),
+                        chatId = chatId,
                         senderId = msgData.senderId.toString(),
-                        receiverId = msgData.receiverId.toString(),
-                        message = msgData.content,
-                        imageBase64 = msgData.mediaUrl ?: "",
-                        postId = null,
-                        timestamp = System.currentTimeMillis(),
-                        isEdited = false,
-                        isDeleted = false,
-                        isSentByCurrentUser = msgData.senderId.toString() == currentUserId
+                        type = if (msgData.mediaUrl.isNullOrEmpty()) "text" else "image",
+                        content = msgData.messageText ?: msgData.mediaUrl ?: "",
+                        timestamp = System.currentTimeMillis()
                     ))
                 }
                 messageAdapter.notifyDataSetChanged()
@@ -344,7 +340,7 @@ class Chat : AppCompatActivity() {
         }
         
         lifecycleScope.launch {
-            val result = messageRepository.sendMessage(receiverId, text)
+            val result = messageRepository.sendTextMessage(receiverId, text)
             result.onSuccess {
                 messageInput.text.clear()
                 loadMessages() // Refresh messages
@@ -363,25 +359,12 @@ class Chat : AppCompatActivity() {
         }
         
         lifecycleScope.launch {
-            try {
-                val inputStream = contentResolver.openInputStream(imageUri)
-                val bytes = inputStream?.readBytes()
-                inputStream?.close()
-                
-                if (bytes != null) {
-                    val base64Image = android.util.Base64.encodeToString(bytes, android.util.Base64.DEFAULT)
-                    val result = messageRepository.sendMessage(receiverId, "", base64Image)
-                    result.onSuccess {
-                        Toast.makeText(this@Chat, "Image sent", Toast.LENGTH_SHORT).show()
-                        loadMessages() // Refresh messages
-                    }.onFailure { error ->
-                        Toast.makeText(this@Chat, "Failed to send image: ${error.message}", Toast.LENGTH_SHORT).show()
-                    }
-                } else {
-                    Toast.makeText(this@Chat, "Failed to read image", Toast.LENGTH_SHORT).show()
-                }
-            } catch (e: Exception) {
-                Toast.makeText(this@Chat, "Error: ${e.message}", Toast.LENGTH_SHORT).show()
+            val result = messageRepository.sendMediaMessage(receiverId, imageUri, "image")
+            result.onSuccess {
+                Toast.makeText(this@Chat, "Image sent", Toast.LENGTH_SHORT).show()
+                loadMessages() // Refresh messages
+            }.onFailure { error ->
+                Toast.makeText(this@Chat, "Failed to send image: ${error.message}", Toast.LENGTH_SHORT).show()
             }
         }
     }
@@ -401,19 +384,12 @@ class Chat : AppCompatActivity() {
     }
     
     private fun sharePost(postId: String) {
-        chatRepository.sendPost(chatId, postId) { success ->
-            runOnUiThread {
-                if (success) {
-                    Toast.makeText(this, "Post shared", Toast.LENGTH_SHORT).show()
-                } else {
-                    Toast.makeText(this, "Failed to share post", Toast.LENGTH_SHORT).show()
-                }
-            }
-        }
+        // Post sharing functionality - to be implemented
+        Toast.makeText(this, "Post sharing not yet implemented", Toast.LENGTH_SHORT).show()
     }
 
     private fun showMessageOptionsDialog(message: ChatMessage) {
-        val currentUserId = FirebaseAuth.getInstance().currentUser?.uid ?: return
+        val currentUserId = sessionManager.getUserId().toString()
         
         // Only allow editing/deleting own messages
         if (message.senderId != currentUserId) {
@@ -463,13 +439,13 @@ class Chat : AppCompatActivity() {
             .setPositiveButton("Save") { _, _ ->
                 val newText = editText.text.toString().trim()
                 if (newText.isNotEmpty()) {
-                    chatRepository.editMessage(chatId, message.messageId, newText) { success ->
-                        runOnUiThread {
-                            if (success) {
-                                Toast.makeText(this, "Message edited", Toast.LENGTH_SHORT).show()
-                            } else {
-                                Toast.makeText(this, "Failed to edit (5 minute limit)", Toast.LENGTH_SHORT).show()
-                            }
+                    lifecycleScope.launch {
+                        val result = messageRepository.editMessage(message.messageId.toIntOrNull() ?: return@launch, newText)
+                        result.onSuccess {
+                            Toast.makeText(this@Chat, "Message edited", Toast.LENGTH_SHORT).show()
+                            loadMessages()
+                        }.onFailure { error ->
+                            Toast.makeText(this@Chat, "Failed to edit: ${error.message}", Toast.LENGTH_SHORT).show()
                         }
                     }
                 }
@@ -483,13 +459,13 @@ class Chat : AppCompatActivity() {
             .setTitle("Delete Message")
             .setMessage("Are you sure you want to delete this message?")
             .setPositiveButton("Delete") { _, _ ->
-                chatRepository.deleteMessage(chatId, message.messageId) { success ->
-                    runOnUiThread {
-                        if (success) {
-                            Toast.makeText(this, "Message deleted", Toast.LENGTH_SHORT).show()
-                        } else {
-                            Toast.makeText(this, "Failed to delete (5 minute limit)", Toast.LENGTH_SHORT).show()
-                        }
+                lifecycleScope.launch {
+                    val result = messageRepository.deleteMessage(message.messageId.toIntOrNull() ?: return@launch)
+                    result.onSuccess {
+                        Toast.makeText(this@Chat, "Message deleted", Toast.LENGTH_SHORT).show()
+                        loadMessages()
+                    }.onFailure { error ->
+                        Toast.makeText(this@Chat, "Failed to delete: ${error.message}", Toast.LENGTH_SHORT).show()
                     }
                 }
             }
@@ -505,11 +481,11 @@ class Chat : AppCompatActivity() {
     }
     
     private fun startCall(callType: String) {
-        val currentUserId = FirebaseAuth.getInstance().currentUser?.uid
+        val currentUserId = sessionManager.getUserId().toString()
         val otherUserId = otherUserIdForProfile
         val otherUserName = intent.getStringExtra("PersonName") ?: "User"
         
-        if (currentUserId == null || otherUserId == null) {
+        if (otherUserId == null) {
             Toast.makeText(this, "Error: Invalid user", Toast.LENGTH_SHORT).show()
             return
         }
@@ -535,53 +511,30 @@ class Chat : AppCompatActivity() {
     }
     
     private fun sendCallNotification(recipientId: String, channelName: String, callType: String, recipientName: String) {
-        val currentUserId = FirebaseAuth.getInstance().currentUser?.uid ?: return
-        val currentUserName = intent.getStringExtra("PersonName") ?: "User"
+        val currentUserId = sessionManager.getUserId().toString()
+        val currentUserName = sessionManager.getUsername() ?: "User"
         
-        // Get current user's profile image
-        FirebaseDatabase.getInstance().reference
-            .child("users")
-            .child(currentUserId)
-            .get()
-            .addOnSuccessListener { userSnapshot ->
-                val user = userSnapshot.getValue(com.hans.i221271_i220889.models.User::class.java)
-                val callerUsername = user?.username ?: currentUserName
-                val callerProfileImage = user?.profileImageBase64 ?: ""
+        // Get current user's profile data from backend
+        lifecycleScope.launch {
+            try {
+                val profileResult = com.hans.i221271_i220889.repositories.ProfileRepository(this@Chat).getOwnProfile()
+                val callerUsername = if (profileResult.isSuccess) {
+                    profileResult.getOrNull()?.username ?: currentUserName
+                } else {
+                    currentUserName
+                }
                 
                 val callTypeText = if (callType == "video") "video call" else "voice call"
                 
-                // Save notification to database
-                val notificationId = FirebaseDatabase.getInstance().reference
-                    .child("notifications")
-                    .child(recipientId)
-                    .push()
-                    .key ?: return@addOnSuccessListener
+                // Send notification via backend API
+                // Note: This would use NotificationRepository when implemented
+                android.util.Log.d("Chat", "Call notification: $callerUsername calling $recipientName ($callTypeText)")
                 
-                val notificationData = mapOf(
-                    "notificationId" to notificationId,
-                    "type" to "call",
-                    "fromUserId" to currentUserId,
-                    "fromUsername" to callerUsername,
-                    "fromUserProfileImage" to callerProfileImage,
-                    "title" to "Incoming $callTypeText",
-                    "body" to "$callerUsername is calling you",
-                    "timestamp" to System.currentTimeMillis(),
-                    "channelName" to channelName,
-                    "callType" to callType,
-                    "isRead" to false
-                )
-                
-                FirebaseDatabase.getInstance().reference
-                    .child("notifications")
-                    .child(recipientId)
-                    .child(notificationId)
-                    .setValue(notificationData)
-                
-                // Send FCM push notification with call data
-                // Note: In production, you'd send this via Firebase Cloud Functions
-                // For now, the notification is saved to database and will be shown when app is opened
-                android.util.Log.d("Chat", "Call notification saved to database for user: $recipientId")
+                // For now, the Agora call will still work - notification system can be implemented later
+            } catch (e: Exception) {
+                android.util.Log.e("Chat", "Error sending call notification: ${e.message}")
             }
+        }
     }
     
     private fun loadProfileImage() {
@@ -593,48 +546,9 @@ class Chat : AppCompatActivity() {
             return
         }
         
-        android.util.Log.d("Chat", "loadProfileImage: Loading profile image for userId=$userId")
-        FirebaseDatabase.getInstance().reference
-            .child("users")
-            .child(userId)
-            .child("profileImageBase64")
-            .addListenerForSingleValueEvent(object : ValueEventListener {
-                override fun onDataChange(snapshot: DataSnapshot) {
-                    val profileImageBase64 = snapshot.getValue(String::class.java) ?: ""
-                    if (profileImageBase64.isNotEmpty()) {
-                        try {
-                            val bitmap = com.hans.i221271_i220889.utils.Base64Image.base64ToBitmap(profileImageBase64)
-                            if (bitmap != null) {
-                                runOnUiThread {
-                                    profileImageView.setImageBitmap(bitmap)
-                                    android.util.Log.d("Chat", "loadProfileImage: Profile image loaded successfully")
-                                }
-                            } else {
-                                runOnUiThread {
-                                    profileImageView.setImageResource(R.drawable.ic_default_profile)
-                                    android.util.Log.w("Chat", "loadProfileImage: Failed to decode bitmap, using default")
-                                }
-                            }
-                        } catch (e: Exception) {
-                            android.util.Log.e("Chat", "loadProfileImage: Error decoding profile image: ${e.message}", e)
-                            runOnUiThread {
-                                profileImageView.setImageResource(R.drawable.ic_default_profile)
-                            }
-                        }
-                    } else {
-                        android.util.Log.d("Chat", "loadProfileImage: No profile image found, using default")
-                        runOnUiThread {
-                            profileImageView.setImageResource(R.drawable.ic_default_profile)
-                        }
-                    }
-                }
-                
-                override fun onCancelled(error: DatabaseError) {
-                    android.util.Log.e("Chat", "loadProfileImage: Failed to load profile image: ${error.message}")
-                    runOnUiThread {
-                        profileImageView.setImageResource(R.drawable.ic_default_profile)
-                    }
-                }
-            })
+        // Set default profile image for now
+        // Profile image can be loaded from ProfileRepository if needed
+        profileImageView.setImageResource(R.drawable.ic_default_profile)
+        android.util.Log.d("Chat", "loadProfileImage: Using default profile image")
     }
 }
