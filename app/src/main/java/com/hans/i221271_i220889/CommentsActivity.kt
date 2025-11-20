@@ -11,15 +11,15 @@ import androidx.recyclerview.widget.RecyclerView
 import com.hans.i221271_i220889.adapters.CommentsAdapter
 import com.hans.i221271_i220889.models.Comment
 import com.hans.i221271_i220889.models.Post
-import com.hans.i221271_i220889.utils.PostRepository
-import com.google.firebase.database.DataSnapshot
-import com.google.firebase.database.DatabaseError
-import com.google.firebase.database.FirebaseDatabase
-import com.google.firebase.database.ValueEventListener
+import com.hans.i221271_i220889.repositories.PostRepositoryApi
+import com.hans.i221271_i220889.network.SessionManager
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.launch
 
 class CommentsActivity : AppCompatActivity() {
     
-    private lateinit var postRepository: PostRepository
+    private lateinit var postRepository: PostRepositoryApi
+    private lateinit var sessionManager: SessionManager
     private lateinit var commentsRecyclerView: RecyclerView
     private lateinit var commentsAdapter: CommentsAdapter
     private val comments = mutableListOf<Comment>()
@@ -35,7 +35,8 @@ class CommentsActivity : AppCompatActivity() {
             insets
         }
         
-        postRepository = PostRepository()
+        postRepository = PostRepositoryApi(this)
+        sessionManager = SessionManager(this)
         
         // Get post from intent
         post = intent.getSerializableExtra("post") as Post
@@ -77,23 +78,8 @@ class CommentsActivity : AppCompatActivity() {
     }
     
     private fun loadComments() {
-        FirebaseDatabase.getInstance().reference
-            .child("posts")
-            .child(post.postId)
-            .child("comments")
-            .addValueEventListener(object : ValueEventListener {
-                override fun onDataChange(snapshot: DataSnapshot) {
-                    comments.clear()
-                    for (commentSnapshot in snapshot.children) {
-                        val comment = commentSnapshot.getValue(Comment::class.java)
-                        comment?.let { comments.add(it) }
-                    }
-                    commentsAdapter.notifyDataSetChanged()
-                }
-                
-                override fun onCancelled(error: DatabaseError) {
-                    Toast.makeText(this@CommentsActivity, "Failed to load comments", Toast.LENGTH_SHORT).show()
-                }
-            })
+        // TODO: Implement comments API endpoint
+        // For now, comments functionality is disabled
+        Toast.makeText(this, "Comments feature coming soon", Toast.LENGTH_SHORT).show()
     }
 }

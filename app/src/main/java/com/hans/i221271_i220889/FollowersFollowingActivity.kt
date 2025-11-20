@@ -28,7 +28,6 @@ class FollowersFollowingActivity : AppCompatActivity() {
         currentMode = intent.getStringExtra("mode") ?: "followers"
         targetUserId = intent.getStringExtra("userId")
         
-        // Create simple UI programmatically
         createSimpleFollowersFollowingScreen()
         
         try {

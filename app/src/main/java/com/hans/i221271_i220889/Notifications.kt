@@ -10,20 +10,16 @@ import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
-import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.database.DataSnapshot
-import com.google.firebase.database.DatabaseError
-import com.google.firebase.database.FirebaseDatabase
-import com.google.firebase.database.ValueEventListener
 import com.hans.i221271_i220889.adapters.NotificationAdapter
 import com.hans.i221271_i220889.models.Notification
+import com.hans.i221271_i220889.network.SessionManager
 
 class Notifications : AppCompatActivity() {
     
     private lateinit var notificationsRecyclerView: RecyclerView
     private lateinit var notificationAdapter: NotificationAdapter
+    private lateinit var sessionManager: SessionManager
     private val notifications = mutableListOf<Notification>()
-    private val currentUserId = FirebaseAuth.getInstance().currentUser?.uid
     
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -70,12 +66,11 @@ class Notifications : AppCompatActivity() {
         }
         
         // Setup notifications RecyclerView
+        sessionManager = SessionManager(this)
         setupNotificationsRecyclerView()
         
-        // Load notifications
-        if (currentUserId != null) {
-            loadNotifications()
-        }
+        // Load notifications from API (to be implemented)
+        loadNotifications()
     }
     
     private fun setupNotificationsRecyclerView() {
@@ -88,67 +83,16 @@ class Notifications : AppCompatActivity() {
     }
     
     private fun loadNotifications() {
-        if (currentUserId == null) return
-        
-        FirebaseDatabase.getInstance().reference
-            .child("notifications")
-            .child(currentUserId)
-            .orderByChild("timestamp")
-            .addValueEventListener(object : ValueEventListener {
-                override fun onDataChange(snapshot: DataSnapshot) {
-                    notifications.clear()
-                    
-                    for (notificationSnapshot in snapshot.children) {
-                        try {
-                            // Use direct property access instead of Map deserialization
-                            val notification = Notification(
-                                notificationId = notificationSnapshot.child("notificationId").getValue(String::class.java) ?: notificationSnapshot.key ?: "",
-                                type = notificationSnapshot.child("type").getValue(String::class.java) ?: "",
-                                fromUserId = notificationSnapshot.child("fromUserId").getValue(String::class.java) ?: "",
-                                fromUsername = notificationSnapshot.child("fromUsername").getValue(String::class.java) ?: "",
-                                fromUserProfileImage = notificationSnapshot.child("fromUserProfileImage").getValue(String::class.java) ?: "",
-                                title = notificationSnapshot.child("title").getValue(String::class.java) ?: "",
-                                body = notificationSnapshot.child("body").getValue(String::class.java) ?: "",
-                                timestamp = notificationSnapshot.child("timestamp").getValue(Long::class.java) ?: System.currentTimeMillis(),
-                                postId = notificationSnapshot.child("postId").getValue(String::class.java) ?: "",
-                                channelName = notificationSnapshot.child("channelName").getValue(String::class.java) ?: "",
-                                callType = notificationSnapshot.child("callType").getValue(String::class.java) ?: "",
-                                isRead = notificationSnapshot.child("isRead").getValue(Boolean::class.java) ?: false
-                            )
-                            notifications.add(notification)
-                        } catch (e: Exception) {
-                            android.util.Log.e("Notifications", "Error parsing notification: ${e.message}", e)
-                        }
-                    }
-                    
-                    // Sort by timestamp (newest first)
-                    notifications.sortByDescending { it.timestamp }
-                    
-                    // Filter to show only follow_request and like notifications
-                    val filteredNotifications = notifications.filter { 
-                        it.type == "follow_request" || it.type == "like" 
-                    }
-                    
-                    runOnUiThread {
-                        notificationAdapter.updateNotifications(filteredNotifications)
-                    }
-                }
-                
-                override fun onCancelled(error: DatabaseError) {
-                    android.util.Log.e("Notifications", "Failed to load notifications: ${error.message}")
-                }
-            })
+        // TODO: Implement notifications API endpoint
+        // For now, notifications list is empty
+        android.util.Log.d("Notifications", "Notifications feature to be implemented with API")
     }
     
     private fun handleNotificationClick(notification: Notification) {
-        // Mark as read
-        if (!notification.isRead && currentUserId != null) {
-            FirebaseDatabase.getInstance().reference
-                .child("notifications")
-                .child(currentUserId)
-                .child(notification.notificationId)
-                .child("isRead")
-                .setValue(true)
+        // Mark as read - to be implemented with API
+        if (!notification.isRead) {
+            // TODO: Call API to mark notification as read
+            android.util.Log.d("Notifications", "Mark notification as read: ${notification.notificationId}")
         }
         
         when (notification.type) {
