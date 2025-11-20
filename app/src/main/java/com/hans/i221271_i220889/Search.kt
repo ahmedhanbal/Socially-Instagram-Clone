@@ -6,19 +6,16 @@ import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import androidx.lifecycle.lifecycleScope
 import com.hans.i221271_i220889.adapters.UserAdapter
 import com.hans.i221271_i220889.models.User
-import com.hans.i221271_i220889.utils.FirebaseAuthManager
-import com.hans.i221271_i220889.utils.FollowManager
-import com.google.firebase.database.FirebaseDatabase
-import com.google.firebase.database.ValueEventListener
-import com.google.firebase.database.DataSnapshot
-import com.google.firebase.database.DatabaseError
+import com.hans.i221271_i220889.repositories.SearchRepository
+import com.hans.i221271_i220889.network.SessionManager
+import kotlinx.coroutines.launch
 
 class Search : AppCompatActivity() {
-    private val database: FirebaseDatabase = FirebaseDatabase.getInstance()
-    private val authManager = FirebaseAuthManager()
-    private lateinit var followManager: FollowManager
+    private lateinit var searchRepository: SearchRepository
+    private lateinit var sessionManager: SessionManager
     private lateinit var searchResultsRecyclerView: RecyclerView
     private lateinit var userAdapter: UserAdapter
     private val searchResults = mutableListOf<User>()
@@ -27,14 +24,12 @@ class Search : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         
+        // Initialize repositories
+        searchRepository = SearchRepository(this)
+        sessionManager = SessionManager(this)
+        
         // Create simple UI programmatically
         createSimpleSearchScreen()
-        
-        try {
-            followManager = FollowManager()
-        } catch (e: Exception) {
-            // If Firebase fails to initialize, continue without it
-        }
         
         setupSearchResultsRecyclerView()
     }
@@ -204,25 +199,30 @@ class Search : AppCompatActivity() {
     }
     
     private fun searchUsers(query: String) {
-        try {
-            val currentUser = authManager.getCurrentUser()
-            if (currentUser != null) {
-                when (currentFilter) {
-                    "followers" -> {
-                        searchInFollowers(query, currentUser.userId)
-                    }
-                    "following" -> {
-                        searchInFollowing(query, currentUser.userId)
-                    }
-                    else -> {
-                        searchAllUsers(query)
-                    }
+        if (query.isEmpty()) {
+            Toast.makeText(this, "Please enter a search query", Toast.LENGTH_SHORT).show()
+            return
+        }
+        
+        lifecycleScope.launch {
+            val result = searchRepository.searchUsers(query)
+            result.onSuccess { userDataList ->
+                searchResults.clear()
+                userDataList.forEach { userData ->
+                    searchResults.add(User(
+                        userId = userData.id.toString(),
+                        username = userData.username,
+                        email = userData.email,
+                        profilePictureBase64 = userData.profilePicture ?: "",
+                        bio = userData.bio ?: "",
+                        followersCount = userData.followersCount,
+                        followingCount = userData.followingCount
+                    ))
                 }
-            } else {
-                searchAllUsers(query)
+                userAdapter.notifyDataSetChanged()
+            }.onFailure { error ->
+                Toast.makeText(this@Search, "Search failed: ${error.message}", Toast.LENGTH_SHORT).show()
             }
-        } catch (e: Exception) {
-            Toast.makeText(this, "Demo mode - Search functionality", Toast.LENGTH_SHORT).show()
         }
     }
     
