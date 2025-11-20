@@ -15,9 +15,6 @@ import android.text.InputType
 import android.widget.ImageButton
 import android.app.DatePickerDialog
 import com.hans.i221271_i220889.utils.Base64Image
-import com.hans.i221271_i220889.utils.FirebaseAuthManager
-import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.database.FirebaseDatabase
 import com.google.android.material.textfield.TextInputEditText
 import java.util.Calendar
 import com.hans.i221271_i220889.network.ApiClient
@@ -30,8 +27,6 @@ import kotlinx.coroutines.withContext
 class signup : AppCompatActivity() {
 
     private var selectedImageUri: Uri? = null
-    private lateinit var authManager: FirebaseAuthManager
-    private val database: FirebaseDatabase = FirebaseDatabase.getInstance()
     private lateinit var cameraButton: ImageButton
     private lateinit var sessionManager: SessionManager
 
@@ -53,12 +48,6 @@ class signup : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
-        try {
-            authManager = FirebaseAuthManager()
-        } catch (e: Exception) {
-            Toast.makeText(this, "Firebase initialization failed", Toast.LENGTH_SHORT).show()
-        }
-        
         sessionManager = SessionManager(this)
 
         try {

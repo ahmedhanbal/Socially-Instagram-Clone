@@ -9,8 +9,6 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import android.view.Gravity
 import com.google.firebase.FirebaseApp
-import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.database.FirebaseDatabase
 import com.hans.i221271_i220889.network.SessionManager
 
 class MainActivity : Activity() {
