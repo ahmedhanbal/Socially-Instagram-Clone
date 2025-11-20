@@ -10,9 +10,16 @@ import android.content.Intent
 import android.widget.Button
 import com.google.android.material.textfield.TextInputEditText
 import com.hans.i221271_i220889.utils.FirebaseAuthManager
+import com.hans.i221271_i220889.network.ApiClient
+import com.hans.i221271_i220889.network.SessionManager
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class LoginActivity : AppCompatActivity() {
     private lateinit var authManager: FirebaseAuthManager
+    private lateinit var sessionManager: SessionManager
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -30,6 +37,14 @@ class LoginActivity : AppCompatActivity() {
             authManager = FirebaseAuthManager()
         } catch (e: Exception) {
             Toast.makeText(this, "Firebase initialization failed: ${e.message}", Toast.LENGTH_LONG).show()
+        }
+        
+        sessionManager = SessionManager(this)
+        
+        // Check if already logged in
+        if (sessionManager.isLoggedIn()) {
+            navigateToHomeScreen()
+            return
         }
 
         setupLoginButton()
@@ -56,27 +71,49 @@ class LoginActivity : AppCompatActivity() {
                 return@setOnClickListener
             }
             
-            // Try to login with Firebase
-            try {
-                authManager.signIn(email, password, this) { success, message ->
-                    if (success) {
-                        // Login successful, go to home screen
-                        val intent = Intent(this, HomeScreen::class.java)
-                        startActivity(intent)
-                        finish()
-                    } else {
-                        // Login failed, show error message
-                        Toast.makeText(this, message ?: "Login failed", Toast.LENGTH_SHORT).show()
+            // Login with new PHP API
+            loginButton.isEnabled = false
+            CoroutineScope(Dispatchers.IO).launch {
+                try {
+                    val response = ApiClient.apiService.login(
+                        username = email, // Can be email or username
+                        password = password,
+                        fcmToken = null // TODO: Get from FCM later
+                    )
+                    
+                    withContext(Dispatchers.Main) {
+                        loginButton.isEnabled = true
+                        if (response.isSuccessful && response.body()?.isSuccess() == true) {
+                            val authData = response.body()?.data
+                            if (authData != null) {
+                                // Save session
+                                sessionManager.saveSession(authData)
+                                
+                                Toast.makeText(this@LoginActivity, "Login successful!", Toast.LENGTH_SHORT).show()
+                                navigateToHomeScreen()
+                            } else {
+                                Toast.makeText(this@LoginActivity, "Login failed: Invalid response", Toast.LENGTH_SHORT).show()
+                            }
+                        } else {
+                            val errorMsg = response.body()?.message ?: "Login failed"
+                            Toast.makeText(this@LoginActivity, errorMsg, Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                } catch (e: Exception) {
+                    withContext(Dispatchers.Main) {
+                        loginButton.isEnabled = true
+                        Toast.makeText(this@LoginActivity, "Network error: ${e.message}", Toast.LENGTH_LONG).show()
                     }
                 }
-            } catch (e: Exception) {
-                // If Firebase fails, just navigate to home screen for now
-                Toast.makeText(this, "Firebase error, proceeding without auth", Toast.LENGTH_SHORT).show()
-                val intent = Intent(this, HomeScreen::class.java)
-                startActivity(intent)
-                finish()
             }
         }
+    }
+    
+    private fun navigateToHomeScreen() {
+        val intent = Intent(this, HomeScreen::class.java)
+        intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+        startActivity(intent)
+        finish()
     }
     
     private fun setupSignupButton() {

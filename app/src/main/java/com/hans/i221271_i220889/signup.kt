@@ -20,6 +20,12 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.database.FirebaseDatabase
 import com.google.android.material.textfield.TextInputEditText
 import java.util.Calendar
+import com.hans.i221271_i220889.network.ApiClient
+import com.hans.i221271_i220889.network.SessionManager
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class signup : AppCompatActivity() {
 
@@ -27,6 +33,7 @@ class signup : AppCompatActivity() {
     private lateinit var authManager: FirebaseAuthManager
     private val database: FirebaseDatabase = FirebaseDatabase.getInstance()
     private lateinit var cameraButton: ImageButton
+    private lateinit var sessionManager: SessionManager
 
     // Launcher for image picker
     private val pickImage = registerForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
@@ -51,6 +58,8 @@ class signup : AppCompatActivity() {
         } catch (e: Exception) {
             Toast.makeText(this, "Firebase initialization failed", Toast.LENGTH_SHORT).show()
         }
+        
+        sessionManager = SessionManager(this)
 
         try {
             setContentView(R.layout.activity_signup)
@@ -127,28 +136,45 @@ class signup : AppCompatActivity() {
                 return@setOnClickListener
             }
 
-            // Sign up with Firebase
-            authManager.signUp(email, password, username, this) { success, message ->
-                if (success) {
-                    // Save profile image as Base64 if selected
-                    val currentUser = FirebaseAuth.getInstance().currentUser
-                    if (currentUser != null && selectedImageUri != null) {
-                        val base64Image = Base64Image.uriToBase64(this, selectedImageUri!!, 70)
-                        if (base64Image != null) {
-                            database.reference.child("users").child(currentUser.uid)
-                                .child("profileImageBase64").setValue(base64Image)
+            // Sign up with new PHP API
+            createButton.isEnabled = false // Prevent double click
+            CoroutineScope(Dispatchers.IO).launch {
+                try {
+                    val response = ApiClient.apiService.signup(
+                        username = username,
+                        email = email,
+                        password = password,
+                        fullName = null
+                    )
+                    
+                    withContext(Dispatchers.Main) {
+                        createButton.isEnabled = true
+                        if (response.isSuccessful && response.body()?.isSuccess() == true) {
+                            val authData = response.body()?.data
+                            if (authData != null) {
+                                // Save session
+                                sessionManager.saveSession(authData)
+                                
+                                Toast.makeText(this@signup, "Account created successfully!", Toast.LENGTH_SHORT).show()
+                                
+                                // Navigate to home screen
+                                val intent = Intent(this@signup, HomeScreen::class.java)
+                                intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+                                startActivity(intent)
+                                finish()
+                            } else {
+                                Toast.makeText(this@signup, "Signup failed: Invalid response", Toast.LENGTH_SHORT).show()
+                            }
+                        } else {
+                            val errorMsg = response.body()?.message ?: "Signup failed"
+                            Toast.makeText(this@signup, errorMsg, Toast.LENGTH_SHORT).show()
                         }
                     }
-                    
-                    Toast.makeText(this, "Account created successfully!", Toast.LENGTH_SHORT).show()
-                    
-                    // Navigate to home screen
-                    val intent = Intent(this, HomeScreen::class.java)
-                    intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
-                    startActivity(intent)
-                    finish()
-                } else {
-                    Toast.makeText(this, message ?: "Signup failed", Toast.LENGTH_SHORT).show()
+                } catch (e: Exception) {
+                    withContext(Dispatchers.Main) {
+                        createButton.isEnabled = true
+                        Toast.makeText(this@signup, "Network error: ${e.message}", Toast.LENGTH_LONG).show()
+                    }
                 }
             }
         }
@@ -278,24 +304,38 @@ class signup : AppCompatActivity() {
                     return@setOnClickListener
                 }
 
-                authManager.signUp(email, password, username, this@signup) { success, message ->
-                    if (success) {
-                        val currentUser = FirebaseAuth.getInstance().currentUser
-                        if (currentUser != null && selectedImageUri != null) {
-                            val base64Image = Base64Image.uriToBase64(this@signup, selectedImageUri!!, 70)
-                            if (base64Image != null) {
-                                database.reference.child("users").child(currentUser.uid)
-                                    .child("profileImageBase64").setValue(base64Image)
+                isEnabled = false
+                CoroutineScope(Dispatchers.IO).launch {
+                    try {
+                        val response = ApiClient.apiService.signup(
+                            username = username,
+                            email = email,
+                            password = password,
+                            fullName = null
+                        )
+                        
+                        withContext(Dispatchers.Main) {
+                            isEnabled = true
+                            if (response.isSuccessful && response.body()?.isSuccess() == true) {
+                                val authData = response.body()?.data
+                                if (authData != null) {
+                                    sessionManager.saveSession(authData)
+                                    Toast.makeText(this@signup, "Account created successfully!", Toast.LENGTH_SHORT).show()
+                                    val intent = Intent(this@signup, HomeScreen::class.java)
+                                    intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+                                    startActivity(intent)
+                                    finish()
+                                }
+                            } else {
+                                val errorMsg = response.body()?.message ?: "Signup failed"
+                                Toast.makeText(this@signup, errorMsg, Toast.LENGTH_SHORT).show()
                             }
                         }
-                        
-                        Toast.makeText(this@signup, "Account created successfully!", Toast.LENGTH_SHORT).show()
-                val intent = Intent(this@signup, HomeScreen::class.java)
-                        intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
-                startActivity(intent)
-                finish()
-                    } else {
-                        Toast.makeText(this@signup, message ?: "Signup failed", Toast.LENGTH_SHORT).show()
+                    } catch (e: Exception) {
+                        withContext(Dispatchers.Main) {
+                            isEnabled = true
+                            Toast.makeText(this@signup, "Network error: ${e.message}", Toast.LENGTH_LONG).show()
+                        }
                     }
                 }
             }
