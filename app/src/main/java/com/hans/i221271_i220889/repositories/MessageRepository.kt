@@ -182,9 +182,10 @@ class MessageRepository(private val context: Context) {
      */
     suspend fun markMessagesSeen(otherUserId: Int): Result<Boolean> = withContext(Dispatchers.IO) {
         try {
+            val request = com.hans.i221271_i220889.network.MarkSeenRequest(otherUserId = otherUserId)
             val response = ApiClient.apiService.markMessagesSeen(
                 token = sessionManager.getAuthHeader(),
-                otherUserId = otherUserId
+                body = request
             )
             
             if (response.isSuccessful && response.body()?.isSuccess() == true) {
