@@ -9,16 +9,18 @@ import androidx.recyclerview.widget.RecyclerView
 import com.hans.i221271_i220889.R
 import com.hans.i221271_i220889.models.Post
 import com.hans.i221271_i220889.utils.Base64Image
-import com.hans.i221271_i220889.utils.PostRepository
-import com.google.firebase.auth.FirebaseAuth
+import com.hans.i221271_i220889.repositories.PostRepositoryApi
+import com.hans.i221271_i220889.network.SessionManager
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.launch
 
 class PostAdapter(
     private val posts: MutableList<Post>,
+    private val postRepository: PostRepositoryApi,
+    private val sessionManager: SessionManager,
+    private val lifecycleScope: CoroutineScope,
     private val onCommentClick: (Post) -> Unit
 ) : RecyclerView.Adapter<PostAdapter.PostViewHolder>() {
-
-    private val postRepository = PostRepository()
-    private val auth = FirebaseAuth.getInstance()
 
     class PostViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
         val profileImage: ImageView = itemView.findViewById(R.id.profileImage)
@@ -42,7 +44,7 @@ class PostAdapter(
 
     override fun onBindViewHolder(holder: PostViewHolder, position: Int) {
         val post = posts[position]
-        val currentUserId = auth.currentUser?.uid
+        val currentUserId = sessionManager.getSession()?.userId?.toString()
 
         // Set profile image (Base64 encoded)
         if (post.userProfileImage.isNotEmpty()) {
@@ -71,25 +73,25 @@ class PostAdapter(
         }
 
         // Set like button state
-        val isLiked = currentUserId?.let { post.likes.contains(it) } ?: false
+        val isLiked = post.isLikedByCurrentUser
         holder.likeButton.setImageResource(
             if (isLiked) R.drawable.like_filled else R.drawable.like
         )
 
         // Set like count
-        holder.likeCount.text = "${post.likeCount} likes"
+        holder.likeCount.text = "${post.likesCount} likes"
 
         // Set caption
         holder.caption.text = "${post.username} ${post.caption}"
 
         // Set comment count
-        holder.commentCount.text = "View all ${post.commentCount} comments"
+        holder.commentCount.text = "View all ${post.commentsCount} comments"
 
         // Set up click listeners
         // Profile image click - navigate to user profile
         holder.profileImage.setOnClickListener {
             val context = holder.itemView.context
-            val currentUserId = auth.currentUser?.uid
+            val currentUserId = sessionManager.getSession()?.userId?.toString()
             // If clicking own profile, go to OwnProfile, else UserProfile
             if (post.userId == currentUserId) {
                 val intent = Intent(context, com.hans.i221271_i220889.OwnProfile::class.java)
@@ -104,7 +106,7 @@ class PostAdapter(
         // Username click - navigate to user profile
         holder.username.setOnClickListener {
             val context = holder.itemView.context
-            val currentUserId = auth.currentUser?.uid
+            val currentUserId = sessionManager.getSession()?.userId?.toString()
             // If clicking own profile, go to OwnProfile, else UserProfile
             if (post.userId == currentUserId) {
                 val intent = Intent(context, com.hans.i221271_i220889.OwnProfile::class.java)
@@ -122,21 +124,26 @@ class PostAdapter(
         }
 
         holder.likeButton.setOnClickListener {
-            postRepository.likePost(post.postId) { success ->
-                if (success) {
+            val postId = post.postId.toIntOrNull() ?: return@setOnClickListener
+            
+            lifecycleScope.launch {
+                val result = if (isLiked) {
+                    postRepository.unlikePost(postId)
+                } else {
+                    postRepository.likePost(postId)
+                }
+                
+                result.onSuccess {
                     // Update UI optimistically
-                    val newLikes = post.likes.toMutableList()
-                    if (isLiked) {
-                        newLikes.remove(currentUserId)
-                    } else {
-                        currentUserId?.let { newLikes.add(it) }
-                    }
+                    post.isLikedByCurrentUser = !isLiked
+                    post.likesCount = if (isLiked) post.likesCount - 1 else post.likesCount + 1
                     
-                    // Update UI
                     holder.likeButton.setImageResource(
-                        if (!isLiked) R.drawable.like_filled else R.drawable.like
+                        if (post.isLikedByCurrentUser) R.drawable.like_filled else R.drawable.like
                     )
-                    holder.likeCount.text = "${newLikes.size} likes"
+                    holder.likeCount.text = "${post.likesCount} likes"
+                }.onFailure { error ->
+                    Toast.makeText(holder.itemView.context, "Failed to update like: ${error.message}", Toast.LENGTH_SHORT).show()
                 }
             }
         }
