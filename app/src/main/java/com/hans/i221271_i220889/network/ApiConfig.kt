@@ -1,4 +1,4 @@
-package com.hans.i221271_i220889.network
+hpackage com.hans.i221271_i220889.network
 
 object ApiConfig {
     // Change this to your actual server IP when testing
