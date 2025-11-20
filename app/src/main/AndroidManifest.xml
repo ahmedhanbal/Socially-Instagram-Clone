@@ -122,6 +122,20 @@
                 <action android:name="com.google.firebase.MESSAGING_EVENT" />
             </intent-filter>
         </service>
+
+        <!-- Offline Sync Service -->
+        <service
+            android:name=".services.OfflineSyncService"
+            android:exported="false" />
+
+        <!-- Network Connectivity Receiver -->
+        <receiver
+            android:name=".services.NetworkReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.net.conn.CONNECTIVITY_ACTION" />
+            </intent-filter>
+        </receiver>
     </application>
 
 </manifest>
