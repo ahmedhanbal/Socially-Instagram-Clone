@@ -11,8 +11,7 @@ import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import com.hans.i221271_i220889.models.Story
 import com.hans.i221271_i220889.utils.Base64Image
-import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.database.FirebaseDatabase
+import com.hans.i221271_i220889.network.SessionManager
 import java.text.SimpleDateFormat
 import java.util.*
 
