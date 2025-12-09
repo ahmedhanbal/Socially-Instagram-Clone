@@ -1,7 +1,7 @@
 # Socially - Instagram Clone
 
 ## Devs
-[Ahmed Ali Zahid](https://github.com/ahmedhanbal)
+[Ahmed Ali Zahid](https://github.com/ahmedhanbal)\
 [Naveed Ahmed Bajwa](https://github.com/NaveedAhmed5)
 
 # UI
